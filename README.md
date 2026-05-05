@@ -1,5 +1,8 @@
 # EVENTO
 
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://evento-six-livid.vercel.app)
+[![GitHub](https://img.shields.io/badge/GitHub-Repo-blue)](https://github.com/Anurudrr/EVENTO)
+
 EVENTO is a full-stack event marketplace where attendees can discover and book event services, while organizers can create listings, manage bookings, and grow their presence on the platform.
 
 The project combines a React + Vite frontend with an Express + MongoDB backend and supports JWT authentication, OTP-based signup/login, wishlist management, reviews, bookings, contact submissions, and vendor dashboards.
@@ -213,23 +216,7 @@ High-level flow:
 
 ## Screenshots
 
-Add screenshots here after deployment:
-
-```md
-![Home Page](./screenshots/home.png)
-![Services Page](./screenshots/services.png)
-![Event Detail](./screenshots/event-detail.png)
-![Buyer Dashboard](./screenshots/buyer-dashboard.png)
-![Seller Dashboard](./screenshots/seller-dashboard.png)
-```
-
-Suggested screenshots:
-- Home page
-- Explore / services page
-- Event details page
-- Wishlist / bookings dashboard
-- Organizer dashboard
-- Create event modal
+> Screenshots coming soon. Visit the live demo at https://evento-six-livid.vercel.app
 
 ## Testing Checklist
 
@@ -276,6 +263,12 @@ Suggested screenshots:
 - CI/CD pipeline
 
 ## Production Notes
+
+> ⚠️ **Security Notice:** Never commit `.env`, `.vercel.env`, or any secret files to Git.
+> If secrets were previously committed, rotate them immediately:
+> - Cloudinary: cloudinary.com → Settings → Access Keys
+> - JWT_SECRET / OTP_SECRET: regenerate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+> - SMTP: reset via your email provider
 
 - Use a strong `JWT_SECRET`
 - Set `OTP_DELIVERY_MODE=email` and configure SMTP before using live OTP delivery

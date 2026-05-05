@@ -12,5 +12,8 @@ coverage/
 .vercel-env-tmp/
 .dev-mail/
 uploads/
-
 .vercel
+_github_repo
+screenshots/*.png
+screenshots/*.jpg
+!screenshots/.gitkeep
