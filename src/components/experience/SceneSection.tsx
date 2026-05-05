@@ -1,9 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useAnimation } from '../../animations/AnimationProvider';
-
-gsap.registerPlugin(ScrollTrigger);
 
 interface SceneSectionProps {
   id?: string;
@@ -26,52 +23,68 @@ export const SceneSection: React.FC<SceneSectionProps> = ({
 
     const sectionElement = sectionRef.current;
     const ctx = gsap.context(() => {
-      const revealTargets = gsap.utils.toArray<HTMLElement>('[data-scene-reveal]');
-      const parallaxTargets = gsap.utils.toArray<HTMLElement>('[data-scene-parallax]');
+      const revealTargets: HTMLElement[] = Array.from(sectionElement.querySelectorAll<HTMLElement>('[data-scene-reveal]'));
+      let revealCompleted = false;
+      let revealObserver: IntersectionObserver | null = null;
+
+      const revealSection = () => {
+        if (revealCompleted || revealTargets.length === 0) {
+          return;
+        }
+
+        revealCompleted = true;
+        revealObserver?.disconnect();
+
+        gsap.to(revealTargets, {
+          opacity: 1,
+          y: 0,
+          stagger: 0.06,
+          duration: 0.45,
+          ease: 'power2.out',
+          overwrite: 'auto',
+          clearProps: 'willChange',
+        });
+      };
 
       if (revealTargets.length > 0) {
         gsap.set(revealTargets, {
           opacity: 0,
-          y: 48,
-          filter: 'blur(18px)',
-        });
-
-        gsap.timeline({
-          defaults: {
-            duration: 1.05,
-            ease: 'power3.out',
-          },
-          scrollTrigger: {
-            trigger: sectionElement,
-            start: 'top 78%',
-            end: 'bottom 50%',
-            toggleActions: 'play none none reverse',
-          },
-        }).to(revealTargets, {
-          opacity: 1,
-          y: 0,
-          filter: 'blur(0px)',
-          stagger: 0.1,
+          y: 20,
+          willChange: 'transform, opacity',
         });
       }
 
-      parallaxTargets.forEach((target) => {
-        gsap.fromTo(target, {
-          yPercent: 0,
-        }, {
-          yPercent: -12,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: sectionElement,
-            start: 'top bottom',
-            end: 'bottom top',
-            scrub: 0.8,
-          },
-        });
+      revealObserver = new IntersectionObserver(([entry]) => {
+        if (entry?.isIntersecting) {
+          revealSection();
+        }
+      }, {
+        threshold: 0.05,
+        rootMargin: '0px 0px -8% 0px',
       });
+
+      revealObserver.observe(sectionElement);
+
+      const fallbackTimer = window.setTimeout(() => {
+        if (!revealCompleted && sectionElement.getBoundingClientRect().top < window.innerHeight * 0.9) {
+          revealSection();
+        }
+      }, 1400);
+
+      return () => {
+        window.clearTimeout(fallbackTimer);
+        revealObserver?.disconnect();
+        gsap.killTweensOf(revealTargets);
+      };
     }, sectionRef);
 
     return () => {
+      const revealTargets = Array.from(sectionElement.querySelectorAll<HTMLElement>('[data-scene-reveal]'));
+      gsap.set(revealTargets, {
+        opacity: 1,
+        y: 0,
+        clearProps: 'willChange',
+      });
       ctx.revert();
     };
   }, [isReducedMotion]);

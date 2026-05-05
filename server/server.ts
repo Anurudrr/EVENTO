@@ -1,10 +1,18 @@
 import http from 'http';
-import { createApp, configureFrontend, ensureDatabaseConnection } from './app.ts';
+import { createApp, configureFrontend, ensureDatabaseConnection, getDatabaseStatus } from './app.ts';
+import {
+  getFallbackPort,
+  getNodeEnv,
+  getServerHost,
+  getServerPort,
+  hasEnvValue,
+  isDevelopmentEnv,
+} from './utils/env.ts';
 
-const HOST = process.env.HOST || '0.0.0.0';
-const DEFAULT_PORT = Number(process.env.PORT || 3000);
-const FALLBACK_PORT = Number(process.env.FALLBACK_PORT || 3001);
-const hasExplicitPort = Boolean(process.env.PORT);
+const HOST = getServerHost();
+const DEFAULT_PORT = getServerPort();
+const FALLBACK_PORT = getFallbackPort();
+const hasExplicitPort = hasEnvValue('PORT');
 
 let currentPort = DEFAULT_PORT;
 
@@ -45,7 +53,18 @@ const createHttpServer = () => {
 };
 
 async function startServer() {
-  await ensureDatabaseConnection();
+  try {
+    await ensureDatabaseConnection();
+  } catch (error) {
+    if (!isDevelopmentEnv()) {
+      throw error;
+    }
+
+    log('startup', 'Database unavailable. Starting development server in degraded mode.', {
+      message: error instanceof Error ? error.message : 'Unknown database connection error',
+    });
+  }
+
   await configureFrontend(app);
 
   const server = createHttpServer();
@@ -54,9 +73,17 @@ async function startServer() {
     log('startup', 'Backend server is listening.', {
       host: typeof address === 'object' && address ? address.address : HOST,
       port: typeof address === 'object' && address ? address.port : currentPort,
-      nodeEnv: process.env.NODE_ENV || 'development',
+      nodeEnv: getNodeEnv(),
       pid: process.pid,
     });
+
+    const databaseStatus = getDatabaseStatus();
+
+    if (!databaseStatus.connected) {
+      log('startup', 'API routes will return 503 until MongoDB is configured.', {
+        message: databaseStatus.error?.message || 'Database unavailable',
+      });
+    }
   });
 }
 

@@ -64,6 +64,48 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    businessName: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [120, 'Business name cannot be more than 120 characters'],
+    },
+    businessType: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [80, 'Business type cannot be more than 80 characters'],
+    },
+    businessLocation: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [120, 'Business location cannot be more than 120 characters'],
+    },
+    responseTimeHours: {
+      type: Number,
+      min: [1, 'Response time must be at least 1 hour'],
+      max: [168, 'Response time cannot exceed 168 hours'],
+      default: 24,
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['unverified', 'pending', 'verified', 'rejected'],
+      default: 'unverified',
+      index: true,
+    },
+    verificationNotes: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [300, 'Verification notes cannot be more than 300 characters'],
+    },
+    verificationSubmittedAt: {
+      type: Date,
+    },
+    verifiedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
@@ -71,6 +113,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ role: 1, createdAt: -1 });
+userSchema.index({ role: 1, verificationStatus: 1, createdAt: -1 });
 
 // Encrypt password using bcrypt
 userSchema.pre('save', async function (this: any) {

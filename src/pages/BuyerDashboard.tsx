@@ -11,6 +11,7 @@ import { UpiPaymentModal } from '../components/UpiPaymentModal';
 import { Skeleton } from '../components/ui/Skeleton';
 import {
   formatBookingStatus,
+  formatCoordinates,
   formatCurrency,
   formatDateTime,
   formatServicePrice,
@@ -128,6 +129,9 @@ const BuyerDashboard: React.FC = () => {
                       )}
                       {booking.eventLocation && (
                         <p className="text-xs uppercase tracking-wide text-noir-muted">Venue: {booking.eventLocation}</p>
+                      )}
+                      {booking.serviceLocation && (
+                        <p className="text-xs uppercase tracking-wide text-noir-muted">Service pin: {formatCoordinates(booking.serviceLocation)}</p>
                       )}
                       {booking.notes && (
                         <p className="text-xs uppercase tracking-wide text-noir-muted">Notes: {booking.notes}</p>

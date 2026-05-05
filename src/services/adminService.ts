@@ -1,6 +1,6 @@
 import api from './api';
-import { AdminOverview, Booking, PaymentRecord } from '../types';
-import { normalizeAdminOverview, normalizeBooking, normalizePayment } from './normalizers';
+import { AdminOverview, Booking, PaymentRecord, User } from '../types';
+import { normalizeAdminOverview, normalizeBooking, normalizePayment, normalizeUser } from './normalizers';
 
 export const adminService = {
   getOverview: async () => {
@@ -50,6 +50,26 @@ export const adminService = {
       };
     } catch (error) {
       console.error('[admin:reject-payment]', error);
+      throw error;
+    }
+  },
+
+  approveOrganizerVerification: async (organizerId: string, reason?: string) => {
+    try {
+      const payload = (await api.put(`/admin/organizers/${organizerId}/approve`, { reason }))?.data?.data;
+      return payload ? normalizeUser(payload) as User : undefined;
+    } catch (error) {
+      console.error('[admin:approve-organizer]', error);
+      throw error;
+    }
+  },
+
+  rejectOrganizerVerification: async (organizerId: string, reason?: string) => {
+    try {
+      const payload = (await api.put(`/admin/organizers/${organizerId}/reject`, { reason }))?.data?.data;
+      return payload ? normalizeUser(payload) as User : undefined;
+    } catch (error) {
+      console.error('[admin:reject-organizer]', error);
       throw error;
     }
   },

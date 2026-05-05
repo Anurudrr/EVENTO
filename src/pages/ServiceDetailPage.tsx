@@ -1,37 +1,38 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Bookmark,
-  CalendarClock,
   Check,
   Clock3,
-  Loader2,
   Mail,
   MapPin,
-  Phone,
   Share2,
   ShieldCheck,
   Sparkles,
   Star,
-  Users,
 } from 'lucide-react';
 import { ReviewSection } from '../components/ReviewSection';
 import { ServiceCard } from '../components/ServiceCard';
+import { Seo } from '../components/Seo';
 import { UpiPaymentModal } from '../components/UpiPaymentModal';
 import { Skeleton } from '../components/ui/Skeleton';
+import { ServiceBookingPanel, ServiceBookingFormState } from '../components/service-detail/ServiceBookingPanel';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useNearViewport } from '../hooks/useNearViewport';
 import { bookingService } from '../services/bookingService';
 import { serviceService } from '../services/serviceService';
 import { userService } from '../services/userService';
-import { Booking, Service, User } from '../types';
+import { Booking, Service, ServiceLocation as BookingServiceLocation, User } from '../types';
 import {
   FALLBACK_IMAGE_URL,
   formatDate,
-  formatServicePrice,
   formatPriceLabel,
+  formatResponseTime,
+  formatServicePrice,
+  formatVerificationStatus,
   getErrorMessage,
   getProfileImageUrl,
   getServiceImageUrls,
@@ -41,6 +42,7 @@ import {
   getUserBio,
   getUserDisplayName,
 } from '../utils';
+import { copyTextWithPermissionMemory, shareDataWithPermissionMemory } from '../utils/permissions';
 
 const bookingEventTypes = [
   'Wedding',
@@ -51,6 +53,7 @@ const bookingEventTypes = [
   'Engagement',
   'Other',
 ];
+const EventoMap = lazy(() => import('../components/EventoMap').then((module) => ({ default: module.EventoMap })));
 
 const ServiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,7 +67,8 @@ const ServiceDetailPage: React.FC = () => {
   const [isSaved, setIsSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [activeImage, setActiveImage] = useState('');
-  const [bookingForm, setBookingForm] = useState({
+  const [selectedServiceLocation, setSelectedServiceLocation] = useState<BookingServiceLocation | null>(null);
+  const [bookingForm, setBookingForm] = useState<ServiceBookingFormState>({
     contactName: '',
     phone: '',
     eventType: bookingEventTypes[0],
@@ -76,6 +80,7 @@ const ServiceDetailPage: React.FC = () => {
   });
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const { ref: serviceMapRef, isNearViewport: showServiceMap } = useNearViewport<HTMLDivElement>('240px');
 
   useEffect(() => {
     if (user?.name) {
@@ -145,6 +150,7 @@ const ServiceDetailPage: React.FC = () => {
   const serviceLocation = getServiceLocation(service);
   const organizerName = getUserDisplayName(organizer);
   const organizerBio = organizer ? getUserBio(organizer) : '';
+  const organizerVerificationStatus = organizer?.verificationStatus || 'unverified';
   const blockedDates = useMemo(
     () => (service?.availability || []).filter((entry) => !entry.isAvailable),
     [service?.availability],
@@ -196,6 +202,11 @@ const ServiceDetailPage: React.FC = () => {
       return;
     }
 
+    if (!selectedServiceLocation) {
+      showToast('Select the service location on the map before booking', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const booking = await bookingService.createBooking({
@@ -206,6 +217,7 @@ const ServiceDetailPage: React.FC = () => {
         phone: bookingForm.phone.trim(),
         eventType: bookingForm.eventType.trim(),
         eventLocation: bookingForm.eventLocation.trim(),
+        serviceLocation: selectedServiceLocation,
         guests: Number(bookingForm.guests || 1),
         notes: bookingForm.notes.trim(),
       });
@@ -235,14 +247,14 @@ const ServiceDetailPage: React.FC = () => {
     };
 
     try {
-      if (navigator.share) {
-        await navigator.share(payload);
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(payload.url);
+      const shared = await shareDataWithPermissionMemory(payload);
+
+      if (!shared) {
+        await copyTextWithPermissionMemory(payload.url);
         showToast('Service link copied', 'success');
       }
-    } catch {
-      showToast('Unable to share right now', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to share right now', 'error');
     }
   };
 
@@ -274,9 +286,51 @@ const ServiceDetailPage: React.FC = () => {
     return <div className="min-h-screen bg-noir-bg flex items-center justify-center text-noir-ink uppercase">Service not found</div>;
   }
 
+  const policyBlocks = [
+    {
+      label: 'Cancellation policy',
+      value: service.cancellationPolicy || 'No cancellation policy has been added yet. Confirm terms with the organizer before booking.',
+    },
+    {
+      label: 'Refund policy',
+      value: service.refundPolicy || 'Refund handling has not been added for this listing yet. Payments should be reviewed with the organizer before confirmation.',
+    },
+    {
+      label: 'Service terms',
+      value: service.serviceTerms || 'Specific setup, access, and delivery terms will be confirmed directly by the organizer after booking.',
+    },
+  ];
+
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'ProfessionalService',
+    name: serviceTitle,
+    description: serviceDescription,
+    areaServed: serviceLocation,
+    image: gallery[0] || FALLBACK_IMAGE_URL,
+    provider: organizer ? {
+      '@type': 'Organization',
+      name: organizer.businessName || organizerName,
+    } : undefined,
+    aggregateRating: service.reviews ? {
+      '@type': 'AggregateRating',
+      ratingValue: Number(service.rating || 0).toFixed(1),
+      reviewCount: service.reviews || 0,
+    } : undefined,
+  };
+
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }} className="min-h-screen bg-noir-bg pb-24 pt-32">
-      <div className="container mx-auto space-y-16 px-6">
+    <>
+      <Seo
+        title={serviceTitle}
+        description={serviceDescription}
+        path={`/event/${service._id}`}
+        image={gallery[0] || FALLBACK_IMAGE_URL}
+        type="article"
+        structuredData={structuredData}
+      />
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }} className="min-h-screen bg-noir-bg pb-24 pt-32">
+        <div className="container mx-auto space-y-16 px-6">
         <div className="flex flex-col gap-6 border border-noir-border bg-noir-card p-6 md:flex-row md:items-center md:justify-between">
           <div>
             <Link to="/events" className="inline-flex items-center gap-3 text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-muted">
@@ -287,6 +341,26 @@ const ServiceDetailPage: React.FC = () => {
               <Sparkles className="h-4 w-4" />
               {service.category || 'General'}
             </div>
+            {organizer && (
+              <div className="mt-4 flex flex-wrap gap-3 text-[10px] font-mono font-semibold uppercase tracking-[0.3em]">
+                <div className={`inline-flex items-center gap-2 border px-4 py-2 ${
+                  organizerVerificationStatus === 'verified'
+                    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
+                    : organizerVerificationStatus === 'pending'
+                      ? 'border-amber-500/20 bg-amber-500/10 text-amber-600'
+                      : 'border-noir-border bg-noir-bg text-noir-muted'
+                }`}>
+                  <ShieldCheck className="h-4 w-4" />
+                  {formatVerificationStatus(organizerVerificationStatus)}
+                </div>
+                {organizer.responseTimeHours ? (
+                  <div className="inline-flex items-center gap-2 border border-noir-border bg-noir-bg px-4 py-2 text-noir-accent">
+                    <Clock3 className="h-4 w-4" />
+                    {formatResponseTime(organizer.responseTimeHours)}
+                  </div>
+                ) : null}
+              </div>
+            )}
             <h1 className="mt-5 text-4xl font-display font-semibold uppercase tracking-wide text-noir-ink md:text-6xl">{serviceTitle}</h1>
             <p className="mt-4 max-w-3xl text-sm uppercase tracking-wide text-noir-muted md:text-base">{serviceDescription}</p>
           </div>
@@ -365,6 +439,32 @@ const ServiceDetailPage: React.FC = () => {
             </div>
 
             <div className="border border-noir-border bg-noir-card p-8 md:p-10">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">Venue map</p>
+                  <h2 className="mt-3 text-3xl font-display font-semibold uppercase tracking-wide text-noir-ink">See the pinned location</h2>
+                </div>
+                <p className="max-w-xl text-xs uppercase tracking-wide text-noir-muted">
+                  Exact coordinates appear here whenever the organizer pins a venue on the publishing form.
+                </p>
+              </div>
+
+              <div ref={serviceMapRef} className="mt-8">
+                {showServiceMap ? (
+                  <Suspense fallback={<div className="h-[360px] border border-noir-border bg-white/80 skeleton-shimmer" />}>
+                    <EventoMap
+                      events={[service]}
+                      emptyMessage="This organizer has not pinned an exact venue yet."
+                      height={360}
+                    />
+                  </Suspense>
+                ) : (
+                  <div className="h-[360px] border border-noir-border bg-white/80 skeleton-shimmer" />
+                )}
+              </div>
+            </div>
+
+            <div className="border border-noir-border bg-noir-card p-8 md:p-10">
               <div className="grid gap-6 md:grid-cols-2">
                 <div>
                   <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">Pricing</p>
@@ -399,15 +499,43 @@ const ServiceDetailPage: React.FC = () => {
                   <div>
                     <h2 className="text-2xl font-display font-semibold uppercase tracking-wide text-noir-ink">{organizerName}</h2>
                     <p className="mt-3 text-sm uppercase tracking-wide text-noir-muted">{organizerBio}</p>
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                      <div className="border border-noir-border bg-noir-bg px-4 py-4">
+                        <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">Verification</p>
+                        <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-noir-ink">
+                          {formatVerificationStatus(organizerVerificationStatus)}
+                        </p>
+                      </div>
+                      <div className="border border-noir-border bg-noir-bg px-4 py-4">
+                        <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">Response SLA</p>
+                        <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-noir-ink">
+                          {formatResponseTime(organizer.responseTimeHours)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div className="border border-noir-border bg-noir-bg px-4 py-4">
+                        <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">Business name</p>
+                        <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-noir-ink">
+                          {organizer.businessName || organizerName}
+                        </p>
+                      </div>
+                      <div className="border border-noir-border bg-noir-bg px-4 py-4">
+                        <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">Operating location</p>
+                        <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-noir-ink">
+                          {organizer.businessLocation || serviceLocation}
+                        </p>
+                      </div>
+                    </div>
                     <div className="mt-5 flex flex-wrap gap-4 text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">
                       <a href={`mailto:${organizer.email}?subject=${encodeURIComponent(`Service inquiry: ${serviceTitle}`)}`} className="inline-flex items-center gap-2">
                         <Mail className="h-4 w-4" />
                         Email organizer
                       </a>
-                      {organizer.upiId && (
+                      {organizerVerificationStatus === 'verified' && (
                         <span className="inline-flex items-center gap-2">
                           <ShieldCheck className="h-4 w-4" />
-                          Payments enabled
+                          Verified organizer
                         </span>
                       )}
                     </div>
@@ -416,157 +544,42 @@ const ServiceDetailPage: React.FC = () => {
               </div>
             )}
 
+            <div className="border border-noir-border bg-noir-card p-8 md:p-10">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">Booking policies</p>
+                  <h2 className="mt-3 text-3xl font-display font-semibold uppercase tracking-wide text-noir-ink">Know the terms before you book</h2>
+                </div>
+                <p className="max-w-xl text-xs uppercase tracking-wide text-noir-muted">
+                  These details are shown before payment so buyers can review cancellation, refund, and fulfillment expectations directly on the listing.
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                {policyBlocks.map((policy) => (
+                  <div key={policy.label} className="border border-noir-border bg-noir-bg p-5">
+                    <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">{policy.label}</p>
+                    <p className="mt-3 text-xs uppercase tracking-wide text-noir-muted">{policy.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <ReviewSection serviceId={service._id} />
           </div>
 
           <aside className="lg:col-span-5">
-            <div className="sticky top-32 space-y-8">
-              <div className="border border-noir-border bg-noir-card p-8 md:p-10">
-                <div className="mb-8 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-[10px] font-mono font-semibold uppercase tracking-[0.4em] text-noir-accent">Book this service</div>
-                    <div className="mt-3 text-3xl font-display font-semibold text-noir-ink">{formatServicePrice(service.price)}</div>
-                    <p className="mt-2 text-xs uppercase tracking-wide text-noir-muted">{formatPriceLabel(service.price, service.priceLabel)}</p>
-                  </div>
-                  <div className="border border-noir-border bg-noir-bg px-4 py-3 text-right">
-                    <div className="text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Rating</div>
-                    <div className="mt-2 flex items-center justify-end gap-2 text-sm font-semibold uppercase tracking-wide text-noir-ink">
-                      <Star className="h-4 w-4 text-noir-accent" />
-                      {service.reviews ? Number(service.rating || 0).toFixed(1) : 'New'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Contact name</label>
-                      <input
-                        type="text"
-                        value={bookingForm.contactName}
-                        onChange={(event) => updateBookingForm('contactName', event.target.value)}
-                        placeholder="Your full name"
-                        className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Phone number</label>
-                      <div className="relative">
-                        <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-noir-muted" />
-                        <input
-                          type="tel"
-                          value={bookingForm.phone}
-                          onChange={(event) => updateBookingForm('phone', event.target.value)}
-                          placeholder="+91 98765 43210"
-                          className="w-full border border-noir-border bg-noir-bg py-4 pl-11 pr-5 text-noir-ink focus:border-noir-accent focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Event type</label>
-                      <select
-                        value={bookingForm.eventType}
-                        onChange={(event) => updateBookingForm('eventType', event.target.value)}
-                        className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
-                      >
-                        {bookingEventTypes.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Guests</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={bookingForm.guests}
-                        onChange={(event) => updateBookingForm('guests', event.target.value)}
-                        className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Event location</label>
-                    <input
-                      type="text"
-                      value={bookingForm.eventLocation}
-                      onChange={(event) => updateBookingForm('eventLocation', event.target.value)}
-                      placeholder="Venue or city"
-                      className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Booking date</label>
-                      <input
-                        type="date"
-                        value={bookingForm.date}
-                        onChange={(event) => updateBookingForm('date', event.target.value)}
-                        min={new Date().toISOString().split('T')[0]}
-                        className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Time</label>
-                      <div className="relative">
-                        <Clock3 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-noir-muted" />
-                        <input
-                          type="time"
-                          value={bookingForm.time}
-                          onChange={(event) => updateBookingForm('time', event.target.value)}
-                          className="w-full border border-noir-border bg-noir-bg py-4 pl-11 pr-5 text-noir-ink focus:border-noir-accent focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Special requests</label>
-                    <textarea
-                      value={bookingForm.notes}
-                      onChange={(event) => updateBookingForm('notes', event.target.value)}
-                      rows={4}
-                      placeholder="Tell the organizer about style, venue, timings, or custom requests"
-                      className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleBooking}
-                  disabled={submitting}
-                  className="btn-noir mt-8 flex w-full items-center justify-center gap-3 !rounded-none !py-5"
-                >
-                  {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <CalendarClock className="h-5 w-5" />}
-                  Book Now
-                </button>
-
-                <div className="mt-8 space-y-3 border-t border-noir-border pt-8 text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-muted">
-                  <div className="flex items-center gap-3"><Check className="h-4 w-4 text-noir-accent" /> Instant UPI QR checkout with live verification updates</div>
-                  <div className="flex items-center gap-3"><Users className="h-4 w-4 text-noir-accent" /> Guest count, event type, and phone number are shared with the organizer</div>
-                  <div className="flex items-center gap-3"><ShieldCheck className="h-4 w-4 text-noir-accent" /> Reviews unlock after a completed booking</div>
-                </div>
-              </div>
-
-              {blockedDates.length > 0 && (
-                <div className="border border-noir-border bg-noir-card p-8">
-                  <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">Unavailable dates</p>
-                  <div className="mt-4 space-y-3">
-                    {blockedDates.slice(0, 5).map((entry) => (
-                      <div key={entry.date} className="border border-noir-border bg-noir-bg px-4 py-3">
-                        <p className="text-sm font-display font-semibold uppercase tracking-wide text-noir-ink">{formatDate(entry.date)}</p>
-                        {entry.note && <p className="mt-2 text-xs uppercase tracking-wide text-noir-muted">{entry.note}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <ServiceBookingPanel
+              service={service}
+              bookingForm={bookingForm}
+              blockedDates={blockedDates}
+              selectedServiceLocation={selectedServiceLocation}
+              submitting={submitting}
+              eventTypes={bookingEventTypes}
+              onFieldChange={updateBookingForm}
+              onLocationSelect={setSelectedServiceLocation}
+              onSubmit={handleBooking}
+            />
           </aside>
         </div>
 
@@ -598,14 +611,15 @@ const ServiceDetailPage: React.FC = () => {
         </section>
       </div>
 
-      <UpiPaymentModal
-        open={paymentModalOpen}
-        booking={activeBooking}
-        service={service}
-        onClose={() => setPaymentModalOpen(false)}
-        onPaid={handlePaymentSuccess}
-      />
-    </motion.div>
+        <UpiPaymentModal
+          open={paymentModalOpen}
+          booking={activeBooking}
+          service={service}
+          onClose={() => setPaymentModalOpen(false)}
+          onPaid={handlePaymentSuccess}
+        />
+      </motion.div>
+    </>
   );
 };
 

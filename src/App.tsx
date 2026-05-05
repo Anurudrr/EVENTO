@@ -8,8 +8,10 @@ import { Navbar } from './components/Navbar';
 import { ScrollToTop } from './components/ScrollToTop';
 import { Footer } from './sections/Footer';
 import { useAuth } from './context/AuthContext';
+import { useAnimation } from './animations/AnimationProvider';
 import { CustomCursor } from './components/experience/CustomCursor';
 import { SiteLoader } from './components/experience/SiteLoader';
+import { getDashboardPathForRole } from './utils/dashboard';
 
 const Home = lazy(() => import('./pages/Home'));
 const ServicesPage = lazy(() => import('./pages/ServicesPage'));
@@ -21,6 +23,10 @@ const ServiceDetailPage = lazy(() => import('./pages/ServiceDetailPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const FAQPage = lazy(() => import('./pages/FAQPage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+const RefundPolicyPage = lazy(() => import('./pages/RefundPolicyPage'));
+const CancellationPolicyPage = lazy(() => import('./pages/CancellationPolicyPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -52,7 +58,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: strin
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to={user.role === 'organizer' ? '/dashboard/seller' : '/dashboard/buyer'} replace />;
+    return <Navigate to={getDashboardPathForRole(user.role)} replace />;
   }
 
   return <>{children}</>;
@@ -88,17 +94,18 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const AnimatedRoutes = () => {
   const location = useLocation();
+  const { isReducedMotion } = useAnimation();
   const isDashboardRoute = location.pathname.startsWith('/dashboard/');
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence initial={false} mode="sync">
       <motion.div
         key={location.pathname}
         className="route-stage"
-        initial={isDashboardRoute ? false : { opacity: 0, y: 26, filter: 'blur(18px)' }}
-        animate={isDashboardRoute ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
-        exit={isDashboardRoute ? { opacity: 0 } : { opacity: 0, y: -18, filter: 'blur(14px)' }}
-        transition={{ duration: isDashboardRoute ? 0.16 : 0.58, ease: [0.16, 1, 0.3, 1] }}
+        initial={isDashboardRoute || isReducedMotion ? false : { opacity: 0.985 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 1 }}
+        transition={{ duration: isDashboardRoute || isReducedMotion ? 0.01 : 0.14, ease: 'linear' }}
       >
         <Suspense fallback={<RouteFallback />}>
           <Routes location={location}>
@@ -114,6 +121,10 @@ const AnimatedRoutes = () => {
             <Route path="/about" element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/faq" element={<FAQPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/refund-policy" element={<RefundPolicyPage />} />
+            <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
 
             {/* Auth Routes */}
             <Route path="/login" element={<LoginPage />} />

@@ -1,5 +1,7 @@
-export const FALLBACK_IMAGE_URL = '/images/placeholder.png';
-export const DEFAULT_AVATAR_URL = '/images/placeholder.png';
+import { API_ORIGIN } from '../config/env';
+
+export const FALLBACK_IMAGE_URL = '/images/fallback.jpg';
+export const DEFAULT_AVATAR_URL = '/images/fallback.jpg';
 export const DEFAULT_SERVICE_TITLE = 'Service Title';
 export const DEFAULT_SERVICE_DESCRIPTION = 'No description available';
 export const DEFAULT_SERVICE_PRICE_TEXT = 'Contact for pricing';
@@ -23,10 +25,17 @@ export const getImageUrl = (url?: string | null) => {
   if (!isNonEmptyImage(url)) return FALLBACK_IMAGE_URL;
 
   const trimmedUrl = url.trim();
-  if (trimmedUrl.startsWith('http')) return trimmedUrl;
+  if (/^(?:https?:)?\/\//i.test(trimmedUrl) || trimmedUrl.startsWith('data:') || trimmedUrl.startsWith('blob:')) {
+    return trimmedUrl;
+  }
 
-  const baseUrl = window.location.origin;
-  return `${baseUrl}${trimmedUrl.startsWith('/') ? trimmedUrl : `/${trimmedUrl}`}`;
+  const normalizedPath = trimmedUrl.startsWith('/') ? trimmedUrl : `/${trimmedUrl}`;
+
+  if (normalizedPath.startsWith('/uploads/')) {
+    return `${API_ORIGIN}${normalizedPath}`;
+  }
+
+  return normalizedPath;
 };
 
 export const resolveImageList = (...sources: unknown[]) => {
@@ -119,6 +128,22 @@ export const formatDateTime = (dateString: string, time?: string) => {
   return `${formatDate(dateString)}${time ? ` at ${time}` : ''}`;
 };
 
+export const formatCoordinates = (location?: { lat?: number; lng?: number } | null, fractionDigits = 5) => {
+  if (!location || !Number.isFinite(Number(location.lat)) || !Number.isFinite(Number(location.lng))) {
+    return 'Location unavailable';
+  }
+
+  return `${Number(location.lat).toFixed(fractionDigits)}, ${Number(location.lng).toFixed(fractionDigits)}`;
+};
+
+export const buildDirectionsLink = (location?: { lat?: number; lng?: number } | null) => {
+  if (!location || !Number.isFinite(Number(location.lat)) || !Number.isFinite(Number(location.lng))) {
+    return '';
+  }
+
+  return `https://www.google.com/maps/dir/?api=1&destination=${Number(location.lat)},${Number(location.lng)}`;
+};
+
 export const formatCurrency = (amount: number) => `INR ${Number(amount || 0).toLocaleString('en-IN')}`;
 export const formatServicePrice = (amount?: number) => {
   const normalizedAmount = Number(amount ?? 0);
@@ -141,6 +166,29 @@ export const formatBookingStatus = (status?: string) => {
   }
 
   return status.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+};
+
+export const formatVerificationStatus = (status?: string) => {
+  if (!status) {
+    return 'Unverified';
+  }
+
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+};
+
+export const formatResponseTime = (hours?: number) => {
+  const normalized = Number(hours);
+
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    return 'Response time not set';
+  }
+
+  if (normalized < 24) {
+    return `Replies within ${normalized}h`;
+  }
+
+  const days = Math.round(normalized / 24);
+  return `Replies within ${days} day${days === 1 ? '' : 's'}`;
 };
 
 export const formatRelativeDate = (dateString?: string) => {

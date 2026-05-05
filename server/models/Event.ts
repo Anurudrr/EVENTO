@@ -46,6 +46,16 @@ const eventSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please add a location'],
     },
+    lat: {
+      type: Number,
+      min: [-90, 'Latitude must be at least -90'],
+      max: [90, 'Latitude must be at most 90'],
+    },
+    lng: {
+      type: Number,
+      min: [-180, 'Longitude must be at least -180'],
+      max: [180, 'Longitude must be at most 180'],
+    },
     category: {
       type: String,
       required: [true, 'Please add a category'],
@@ -97,6 +107,8 @@ const eventSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+eventSchema.index({ lat: 1, lng: 1 });
 
 const Event: mongoose.Model<any> = (mongoose.models.Event as mongoose.Model<any>)
   || (mongoose.model<any>('Event', eventSchema) as mongoose.Model<any>);

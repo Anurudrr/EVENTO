@@ -1,22 +1,24 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { CinematicHeroCanvas } from '../components/experience/CinematicHeroCanvas';
 import { HeroEditorialImage } from '../components/hero/HeroEditorialImage';
 import { HeroJourneyCard } from '../components/hero/HeroJourneyCard';
 import { HeroSearchBar } from '../components/hero/HeroSearchBar';
 import { useAnimation } from '../animations/AnimationProvider';
+import { useIdleActivation } from '../hooks/useIdleActivation';
 
-gsap.registerPlugin(ScrollTrigger);
+const CinematicHeroCanvas = lazy(() => import('../components/experience/CinematicHeroCanvas').then((module) => ({
+  default: module.CinematicHeroCanvas,
+})));
 
-export const Hero: React.FC = () => {
+export const Hero: React.FC = React.memo(() => {
   const rootRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
-  const { isReducedMotion } = useAnimation();
+  const { allowCinematicEffects, isReducedMotion } = useAnimation();
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('Anywhere');
+  const shouldRenderCanvas = useIdleActivation(allowCinematicEffects, 2200);
 
   useEffect(() => {
     if (!rootRef.current || isReducedMotion) {
@@ -35,39 +37,8 @@ export const Hero: React.FC = () => {
         .from('[data-hero-copy]', { opacity: 0, y: 24, duration: 0.6 }, '-=0.42')
         .from('[data-hero-search]', { opacity: 0, y: 22, duration: 0.55 }, '-=0.35')
         .from('[data-hero-actions]', { opacity: 0, y: 20, duration: 0.55 }, '-=0.32')
-        .from('[data-hero-card]', { opacity: 0, y: 32, scale: 0.98, duration: 0.78 }, '-=0.45')
+        .from('[data-hero-card]', { opacity: 0, y: 24, duration: 0.55 }, '-=0.45')
         .from('[data-hero-card-item]', { opacity: 0, y: 14, duration: 0.38, stagger: 0.08 }, '-=0.38');
-
-      // Keep the hero feeling layered while still respecting the current scroll system.
-      gsap.to('[data-hero-parallax="content"]', {
-        yPercent: -6,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: sectionElement,
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 0.7,
-        },
-      });
-
-      gsap.to('[data-hero-parallax="card"]', {
-        yPercent: -12,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: sectionElement,
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 0.9,
-        },
-      });
-
-      gsap.to('[data-hero-float]', {
-        y: -14,
-        duration: 5.2,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-      });
     }, rootRef);
 
     return () => {
@@ -95,7 +66,11 @@ export const Hero: React.FC = () => {
   return (
     <section ref={rootRef} className="hero-stage min-h-screen">
       <div className="hero-stage__canvas" data-hero-parallax="canvas">
-        <CinematicHeroCanvas />
+        {shouldRenderCanvas ? (
+          <Suspense fallback={null}>
+            <CinematicHeroCanvas />
+          </Suspense>
+        ) : null}
       </div>
       <div className="hero-stage__backdrop" />
       <div className="hero-stage__grain" />
@@ -167,4 +142,4 @@ export const Hero: React.FC = () => {
       </div>
     </section>
   );
-};
+});

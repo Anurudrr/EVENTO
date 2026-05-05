@@ -12,15 +12,29 @@ import {
 
 const router = express.Router();
 const otpSendLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
+  windowMs: 15 * 60 * 1000,
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many OTP requests. Please try again later.' },
+  message: { success: false, error: 'Too many verification code requests. Please try again later.' },
+});
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many registration attempts. Please try again later.' },
+});
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many login attempts. Please try again later.' },
 });
 const otpVerifyLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 15,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many OTP verification attempts. Please try again later.' },
@@ -33,13 +47,8 @@ const googleAuthLimiter = rateLimit({
   message: { success: false, error: 'Too many Google sign-in attempts. Please try again later.' },
 });
 
-router.use((req, res, next) => {
-  console.log(`[auth:route] ${req.method} ${req.originalUrl}`);
-  next();
-});
-
-router.post('/register', validateRegister, register);
-router.post('/login', validateLogin, login);
+router.post('/register', registerLimiter, validateRegister, register);
+router.post('/login', loginLimiter, validateLogin, login);
 router.post('/send-otp', otpSendLimiter, validateSendOtp, sendOtp);
 router.post('/verify-otp', otpVerifyLimiter, validateVerifyOtp, verifyOtp);
 router.post('/google', googleAuthLimiter, validateGoogleAuth, googleAuth);

@@ -1,6 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Globe, Shield, Users, ArrowRight, Heart, Zap, Star } from 'lucide-react';
+import { Seo } from '../components/Seo';
+import { STATIC_EVENT_IMAGES } from '../constants/images';
+import { FALLBACK_IMAGE_URL } from '../utils';
 
 const AboutPage: React.FC = () => {
   return (
@@ -10,6 +13,11 @@ const AboutPage: React.FC = () => {
       exit={{ opacity: 0 }}
       className="pt-32 bg-noir-bg min-h-screen overflow-hidden relative"
     >
+      <Seo
+        title="About EVENTO"
+        description="Learn how EVENTO is building a trusted marketplace for premium event services, organizer profiles, and buyer booking flows."
+        path="/about"
+      />
       {/* Background Decorative Elements */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] right-[-5%] w-[50%] h-[60%] bg-noir-accent/5 rounded-full blur-[120px]" />
@@ -59,12 +67,13 @@ const AboutPage: React.FC = () => {
             >
               <div className="rounded-none overflow-hidden shadow-2xl shadow-black/50 border border-noir-border aspect-[4/5] bg-noir-card">
                 <img 
-                  src="https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80" 
+                  src={STATIC_EVENT_IMAGES.about}
                   alt="Team" 
                   className="w-full h-full object-cover transition-opacity duration-300" 
-                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
                   onError={(event) => {
-                    (event.target as HTMLImageElement).src = '/images/placeholder.png';
+                    (event.target as HTMLImageElement).src = FALLBACK_IMAGE_URL;
                   }}
                 />
               </div>
@@ -102,7 +111,7 @@ const AboutPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 {[
                   { icon: Globe, title: 'Global Reach', desc: 'Connecting vendors and clients across 50+ countries.', color: 'bg-noir-card text-noir-accent' },
-                  { icon: Shield, title: 'Trusted Quality', desc: 'Every vendor is strictly vetted for excellence.', color: 'bg-noir-card text-noir-accent' },
+                  { icon: Shield, title: 'Trusted Quality', desc: 'Organizer profiles surface verification status, business details, and payout readiness directly on the marketplace.', color: 'bg-noir-card text-noir-accent' },
                   { icon: Users, title: 'Community First', desc: 'Building a supportive network for event professionals.', color: 'bg-noir-card text-noir-accent' },
                   { icon: Zap, title: 'Innovation', desc: 'Constantly evolving the art of event technology.', color: 'bg-noir-card text-noir-accent' },
                 ].map((item, i) => (

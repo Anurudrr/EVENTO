@@ -20,7 +20,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { bookingService } from '../services/bookingService';
 import { userService } from '../services/userService';
 import { Booking, Service, User } from '../types';
-import { DEFAULT_USER_BIO, getErrorMessage, getUserDisplayName } from '../utils';
+import { DEFAULT_USER_BIO, formatResponseTime, formatVerificationStatus, getErrorMessage, getUserDisplayName } from '../utils';
 
 const ProfilePage: React.FC = () => {
   const { user, updateProfile, syncUser } = useAuth();
@@ -42,6 +42,10 @@ const ProfilePage: React.FC = () => {
     bio: user?.bio || '',
     profilePicture: user?.profilePicture || '',
     upiId: user?.upiId || '',
+    businessName: user?.businessName || '',
+    businessType: user?.businessType || '',
+    businessLocation: user?.businessLocation || '',
+    responseTimeHours: user?.responseTimeHours ? String(user.responseTimeHours) : '24',
   });
 
   useEffect(() => {
@@ -53,6 +57,10 @@ const ProfilePage: React.FC = () => {
       bio: user.bio || '',
       profilePicture: user.profilePicture || '',
       upiId: user.upiId || '',
+      businessName: user.businessName || '',
+      businessType: user.businessType || '',
+      businessLocation: user.businessLocation || '',
+      responseTimeHours: user.responseTimeHours ? String(user.responseTimeHours) : '24',
     });
     setImageVersion(Date.now());
   }, [user]);
@@ -122,6 +130,10 @@ const ProfilePage: React.FC = () => {
           email: uploadResponse.user.email || current.email,
           bio: uploadResponse.user.bio || current.bio,
           upiId: uploadResponse.user.upiId || current.upiId,
+          businessName: uploadResponse.user.businessName || current.businessName,
+          businessType: uploadResponse.user.businessType || current.businessType,
+          businessLocation: uploadResponse.user.businessLocation || current.businessLocation,
+          responseTimeHours: uploadResponse.user.responseTimeHours ? String(uploadResponse.user.responseTimeHours) : current.responseTimeHours,
         } : {}),
       }));
 
@@ -189,12 +201,25 @@ const ProfilePage: React.FC = () => {
 
       if (user?.role === 'organizer') {
         const trimmedUpi = (formData.upiId || '').trim();
+        const trimmedBusinessName = (formData.businessName || '').trim();
+        const trimmedBusinessType = (formData.businessType || '').trim();
+        const trimmedBusinessLocation = (formData.businessLocation || '').trim();
+        const parsedResponseTimeHours = Number(formData.responseTimeHours || 24);
         if (trimmedUpi && !/^[\w.-]{2,}@[A-Za-z]{2,}$/.test(trimmedUpi)) {
           setErrorMessage('Please enter a valid UPI ID (e.g. name@bank)');
           setIsUploading(false);
           return;
         }
+        if (!Number.isFinite(parsedResponseTimeHours) || parsedResponseTimeHours < 1 || parsedResponseTimeHours > 168) {
+          setErrorMessage('Response time must be between 1 and 168 hours');
+          setIsUploading(false);
+          return;
+        }
         profilePayload.upiId = trimmedUpi;
+        profilePayload.businessName = trimmedBusinessName;
+        profilePayload.businessType = trimmedBusinessType;
+        profilePayload.businessLocation = trimmedBusinessLocation;
+        profilePayload.responseTimeHours = parsedResponseTimeHours;
       }
 
       await updateProfile(profilePayload);
@@ -236,6 +261,10 @@ const ProfilePage: React.FC = () => {
       bio: user?.bio || '',
       profilePicture: user?.profilePicture || '',
       upiId: user?.upiId || '',
+      businessName: user?.businessName || '',
+      businessType: user?.businessType || '',
+      businessLocation: user?.businessLocation || '',
+      responseTimeHours: user?.responseTimeHours ? String(user.responseTimeHours) : '24',
     });
     setErrorMessage(null);
 
@@ -278,6 +307,14 @@ const ProfilePage: React.FC = () => {
     { label: 'Accepted', value: bookings.filter((booking) => booking.status === 'accepted').length.toString() },
     { label: 'Saved Services', value: wishlist.length.toString() },
   ]), [bookings, wishlist]);
+  const verificationStatus = user?.verificationStatus || 'unverified';
+  const verificationTone = verificationStatus === 'verified'
+    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
+    : verificationStatus === 'pending'
+      ? 'border-amber-500/20 bg-amber-500/10 text-amber-600'
+      : verificationStatus === 'rejected'
+        ? 'border-rose-500/20 bg-rose-500/10 text-rose-600'
+        : 'border-noir-border bg-noir-bg text-noir-accent';
 
   if (!user) return null;
 
@@ -339,6 +376,13 @@ const ProfilePage: React.FC = () => {
                   <Shield className="w-3 h-3" />
                   {user.role}
                 </div>
+
+                {user.role === 'organizer' && (
+                  <div className={`mb-6 inline-flex items-center gap-2 px-4 py-2 text-[10px] font-mono font-semibold uppercase tracking-[0.28em] ${verificationTone}`}>
+                    <Shield className="w-3 h-3" />
+                    {formatVerificationStatus(verificationStatus)}
+                  </div>
+                )}
 
                 <p className="text-noir-muted text-sm leading-relaxed mb-8 italic">
                   {user.bio || DEFAULT_USER_BIO}
@@ -461,16 +505,80 @@ const ProfilePage: React.FC = () => {
                         </div>
 
                         {user?.role === 'organizer' && (
-                          <div className="space-y-3">
-                            <label className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.3em] ml-4 block">
-                              UPI ID (Payment Collection)
-                            </label>
-                            <input 
-                              value={formData.upiId}
-                              onChange={(e) => setFormData(prev => ({ ...prev, upiId: e.target.value }))}
-                              className="w-full bg-noir-bg border border-noir-border rounded-none px-6 py-4 text-noir-ink focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all placeholder:text-noir-muted/30"
-                              placeholder="e.g. yourname@ybl"
-                            />
+                          <div className="space-y-6 border border-noir-border bg-noir-bg p-6">
+                            <div>
+                              <p className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.3em]">
+                                Organizer verification profile
+                              </p>
+                              <p className="mt-2 text-sm uppercase tracking-wide text-noir-muted">
+                                Complete these details to submit your organizer profile for business, policy, and payout review.
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.3em] ml-4 block">
+                                  Business Name
+                                </label>
+                                <input
+                                  value={formData.businessName}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, businessName: e.target.value }))}
+                                  className="w-full bg-noir-bg border border-noir-border rounded-none px-6 py-4 text-noir-ink focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all placeholder:text-noir-muted/30"
+                                  placeholder="Studio or business name"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.3em] ml-4 block">
+                                  Business Type
+                                </label>
+                                <input
+                                  value={formData.businessType}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, businessType: e.target.value }))}
+                                  className="w-full bg-noir-bg border border-noir-border rounded-none px-6 py-4 text-noir-ink focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all placeholder:text-noir-muted/30"
+                                  placeholder="Example: Wedding planner"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.3em] ml-4 block">
+                                  Business Location
+                                </label>
+                                <input
+                                  value={formData.businessLocation}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, businessLocation: e.target.value }))}
+                                  className="w-full bg-noir-bg border border-noir-border rounded-none px-6 py-4 text-noir-ink focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all placeholder:text-noir-muted/30"
+                                  placeholder="Primary operating city"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.3em] ml-4 block">
+                                  Response SLA (Hours)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="168"
+                                  value={formData.responseTimeHours}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, responseTimeHours: e.target.value }))}
+                                  className="w-full bg-noir-bg border border-noir-border rounded-none px-6 py-4 text-noir-ink focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all placeholder:text-noir-muted/30"
+                                  placeholder="24"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.3em] ml-4 block">
+                                UPI ID (Payment Collection)
+                              </label>
+                              <input 
+                                value={formData.upiId}
+                                onChange={(e) => setFormData(prev => ({ ...prev, upiId: e.target.value }))}
+                                className="w-full bg-noir-bg border border-noir-border rounded-none px-6 py-4 text-noir-ink focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all placeholder:text-noir-muted/30"
+                                placeholder="e.g. yourname@ybl"
+                              />
+                            </div>
                           </div>
                         )}
 
@@ -552,20 +660,60 @@ const ProfilePage: React.FC = () => {
                       </div>
 
                       {user.role === 'organizer' && (
-                        <div className="space-y-4">
-                          <h4 className="text-base font-semibold text-noir-ink flex items-center gap-2 uppercase tracking-wide">
-                            <Shield className="w-5 h-5 text-noir-accent" />
-                            Payments & UPI
-                          </h4>
-                          <div className="p-8 bg-noir-bg border border-noir-border rounded-none shadow-sm text-noir-muted leading-relaxed flex flex-col gap-2">
-                            {user.upiId ? (
-                              <>
-                                <span className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.2em]">Active UPI ID</span>
-                                <span className="text-lg font-mono font-semibold text-noir-ink">{user.upiId}</span>
-                              </>
-                            ) : (
-                              "No UPI ID configured. You won't be able to collect payments until you add your UPI ID via 'Edit Profile'."
-                            )}
+                        <div className="space-y-6">
+                          <div className="space-y-4">
+                            <h4 className="text-base font-semibold text-noir-ink flex items-center gap-2 uppercase tracking-wide">
+                              <Shield className="w-5 h-5 text-noir-accent" />
+                              Verification & SLA
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className={`p-6 border rounded-none ${verificationTone}`}>
+                                <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.2em]">Verification Status</p>
+                                <p className="mt-3 text-lg font-semibold uppercase tracking-wide">{formatVerificationStatus(verificationStatus)}</p>
+                                {user.verificationNotes && (
+                                  <p className="mt-3 text-xs uppercase tracking-wide text-current/80">{user.verificationNotes}</p>
+                                )}
+                              </div>
+                              <div className="p-6 bg-noir-bg rounded-none border border-noir-border">
+                                <p className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.2em] mb-2">Response SLA</p>
+                                <p className="text-lg font-semibold text-noir-ink uppercase tracking-wide">
+                                  {formatResponseTime(user.responseTimeHours)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <h4 className="text-base font-semibold text-noir-ink flex items-center gap-2 uppercase tracking-wide">
+                              <Shield className="w-5 h-5 text-noir-accent" />
+                              Business Profile & Payouts
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="p-6 bg-noir-bg rounded-none border border-noir-border">
+                                <p className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.2em] mb-2">Business Name</p>
+                                <p className="text-lg font-semibold text-noir-ink uppercase tracking-wide">
+                                  {user.businessName || 'Not added yet'}
+                                </p>
+                              </div>
+                              <div className="p-6 bg-noir-bg rounded-none border border-noir-border">
+                                <p className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.2em] mb-2">Business Type</p>
+                                <p className="text-lg font-semibold text-noir-ink uppercase tracking-wide">
+                                  {user.businessType || 'Not added yet'}
+                                </p>
+                              </div>
+                              <div className="p-6 bg-noir-bg rounded-none border border-noir-border">
+                                <p className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.2em] mb-2">Operating Location</p>
+                                <p className="text-lg font-semibold text-noir-ink uppercase tracking-wide">
+                                  {user.businessLocation || 'Not added yet'}
+                                </p>
+                              </div>
+                              <div className="p-6 bg-noir-bg rounded-none border border-noir-border">
+                                <p className="text-[10px] font-mono font-semibold text-noir-accent uppercase tracking-[0.2em] mb-2">Active UPI ID</p>
+                                <p className="text-lg font-mono font-semibold text-noir-ink break-all">
+                                  {user.upiId || 'Not added yet'}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}

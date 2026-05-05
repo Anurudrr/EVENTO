@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowUpRight, Bookmark, Briefcase, MapPin, Share2, Star } from 'lucide-react';
+import { ArrowUpRight, Bookmark, Briefcase, Clock3, MapPin, Share2, ShieldCheck, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { Service } from '../types';
 import {
   FALLBACK_IMAGE_URL,
   formatPriceLabel,
+  formatResponseTime,
   formatServicePrice,
   getServiceDescription,
   getServiceImageUrls,
@@ -14,24 +15,40 @@ import {
   logImageDebug,
 } from '../utils';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { userService } from '../services/userService';
+import { shouldEnablePointerEffects } from '../utils/performance';
+import { copyTextWithPermissionMemory, shareDataWithPermissionMemory } from '../utils/permissions';
 
 interface ServiceCardProps {
   service: Service;
+  withEntryAnimation?: boolean;
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service }) => {
+const entryAnimationProps = {
+  initial: { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.2 },
+  transition: { duration: 0.35, ease: 'easeOut' as const },
+} as const;
+
+export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service, withEntryAnimation = true }) => {
   const serviceId = service._id;
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { showToast } = useToast();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const cardFrameRef = React.useRef<HTMLDivElement | null>(null);
+  const pointerFrameRef = React.useRef<number>(0);
+  const boundsRef = React.useRef<DOMRect | null>(null);
+  const pointerRef = React.useRef({ x: 0, y: 0 });
 
   const primaryImage = React.useMemo(() => {
     const [firstImage] = getServiceImageUrls(service);
     return firstImage || FALLBACK_IMAGE_URL;
   }, [service]);
+  const organizer = typeof service.organizer === 'object' ? service.organizer : null;
   const serviceTitle = getServiceTitle(service);
   const serviceDescription = getServiceDescription(service);
   const serviceLocation = getServiceLocation(service);
@@ -74,14 +91,20 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service }) 
 
   useEffect(() => {
     const frame = cardFrameRef.current;
-    if (!frame || typeof window === 'undefined' || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    if (!frame || typeof window === 'undefined' || !shouldEnablePointerEffects()) {
       return undefined;
     }
 
-    const handlePointerMove = (event: PointerEvent) => {
-      const rect = frame.getBoundingClientRect();
-      const offsetX = (event.clientX - rect.left) / rect.width;
-      const offsetY = (event.clientY - rect.top) / rect.height;
+    const applyPointerTransform = () => {
+      pointerFrameRef.current = 0;
+
+      const rect = boundsRef.current;
+      if (!rect || rect.width === 0 || rect.height === 0) {
+        return;
+      }
+
+      const offsetX = (pointerRef.current.x - rect.left) / rect.width;
+      const offsetY = (pointerRef.current.y - rect.top) / rect.height;
       const rotateX = (0.5 - offsetY) * 12;
       const rotateY = (offsetX - 0.5) * 14;
 
@@ -91,18 +114,45 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service }) 
       frame.style.setProperty('--service-glow-y', `${(offsetY * 100).toFixed(2)}%`);
     };
 
+    const handlePointerEnter = () => {
+      boundsRef.current = frame.getBoundingClientRect();
+      frame.style.willChange = 'transform';
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!boundsRef.current) {
+        boundsRef.current = frame.getBoundingClientRect();
+      }
+
+      pointerRef.current.x = event.clientX;
+      pointerRef.current.y = event.clientY;
+
+      if (!pointerFrameRef.current) {
+        pointerFrameRef.current = window.requestAnimationFrame(applyPointerTransform);
+      }
+    };
+
     const resetFrame = () => {
+      if (pointerFrameRef.current) {
+        window.cancelAnimationFrame(pointerFrameRef.current);
+        pointerFrameRef.current = 0;
+      }
+
+      boundsRef.current = null;
+      frame.style.willChange = 'auto';
       frame.style.setProperty('--service-rotate-x', '0deg');
       frame.style.setProperty('--service-rotate-y', '0deg');
       frame.style.setProperty('--service-glow-x', '50%');
       frame.style.setProperty('--service-glow-y', '50%');
     };
 
+    frame.addEventListener('pointerenter', handlePointerEnter);
     frame.addEventListener('pointermove', handlePointerMove);
     frame.addEventListener('pointerleave', resetFrame);
     frame.addEventListener('pointercancel', resetFrame);
 
     return () => {
+      frame.removeEventListener('pointerenter', handlePointerEnter);
       frame.removeEventListener('pointermove', handlePointerMove);
       frame.removeEventListener('pointerleave', resetFrame);
       frame.removeEventListener('pointercancel', resetFrame);
@@ -140,13 +190,14 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service }) 
     };
 
     try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareData.url);
+      const shared = await shareDataWithPermissionMemory(shareData);
+
+      if (!shared) {
+        await copyTextWithPermissionMemory(shareData.url);
+        showToast('Service link copied', 'success');
       }
-    } catch {
-      // Ignore browser-level share failures.
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to share right now', 'error');
     }
   };
 
@@ -154,11 +205,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service }) 
     <motion.article
       data-cursor="VIEW"
       className="service-card group relative h-full"
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
-      whileHover={{ y: -8 }}
+      {...(withEntryAnimation ? entryAnimationProps : {})}
     >
       <div ref={cardFrameRef} className="service-card__frame">
         <div className="service-card__spotlight" />
@@ -181,7 +228,15 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service }) 
             <div className="service-card__veil" />
 
             <div className="service-card__topline">
-              <span className="service-card__category">{service.category}</span>
+              <div className="flex items-center gap-2">
+                <span className="service-card__category">{service.category}</span>
+                {organizer?.verificationStatus === 'verified' && (
+                  <span className="inline-flex items-center gap-1 border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[9px] font-mono font-semibold uppercase tracking-[0.2em] text-emerald-600">
+                    <ShieldCheck className="h-3 w-3" />
+                    Verified
+                  </span>
+                )}
+              </div>
               <div className="service-card__actions">
                 <button
                   onClick={handleWishlistToggle}
@@ -222,6 +277,12 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service }) 
                 <MapPin className="h-4 w-4" />
                 <span>{serviceLocation}</span>
               </div>
+              {organizer?.responseTimeHours ? (
+                <div className="service-card__meta-chip">
+                  <Clock3 className="h-4 w-4" />
+                  <span>{formatResponseTime(organizer.responseTimeHours)}</span>
+                </div>
+              ) : null}
             </div>
 
             <p className="service-card__description">{serviceDescription}</p>

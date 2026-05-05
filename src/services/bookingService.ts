@@ -19,6 +19,10 @@ export const bookingService = {
     phone: string;
     eventType: string;
     eventLocation?: string;
+    serviceLocation: {
+      lat: number;
+      lng: number;
+    };
     guests: number;
     notes?: string;
   }) => {
@@ -61,24 +65,6 @@ export const bookingService = {
     }
   },
 
-  markAsPaid: async (id: string, payload: { transactionId?: string; screenshot?: File | null }) => {
-    try {
-      const formData = new FormData();
-      if (payload.transactionId) {
-        formData.append('transactionId', payload.transactionId);
-      }
-      if (payload.screenshot) {
-        formData.append('screenshot', payload.screenshot);
-      }
-
-      const response = await api.put(`/bookings/${id}/pay`, formData);
-      return normalizeBooking(getRequiredData(response?.data?.data, 'Mark as paid response is missing data'));
-    } catch (error) {
-      console.error('[booking:markAsPaid]', error);
-      throw error;
-    }
-  },
-
   verifyPayment: async (id: string) => {
     try {
       const response = await api.put(`/bookings/${id}/verify`);
@@ -95,6 +81,61 @@ export const bookingService = {
       return normalizeBooking(getRequiredData(response?.data?.data, 'Update booking status response is missing data'));
     } catch (error) {
       console.error('[booking:updateStatus]', error);
+      throw error;
+    }
+  },
+
+  createRazorpayOrder: async (id: string) => {
+    try {
+      const payload = getRequiredData(
+        (await api.post(`/bookings/${id}/payment/razorpay/order`))?.data?.data,
+        'Create Razorpay order response is missing data',
+      );
+
+      return {
+        bookingId: payload.bookingId,
+        bookingReference: payload.bookingReference,
+        orderId: payload.orderId,
+        amount: Number(payload.amount ?? 0),
+        currency: payload.currency || 'INR',
+        keyId: payload.keyId || '',
+        company: payload.company || 'EVENTO',
+        description: payload.description || 'EVENTO booking',
+        prefill: payload.prefill || {},
+      } as {
+        bookingId: string;
+        bookingReference: string;
+        orderId: string;
+        amount: number;
+        currency: string;
+        keyId: string;
+        company: string;
+        description: string;
+        prefill: {
+          name?: string;
+          email?: string;
+          contact?: string;
+        };
+      };
+    } catch (error) {
+      console.error('[booking:createRazorpayOrder]', error);
+      throw error;
+    }
+  },
+
+  verifyRazorpayPayment: async (
+    id: string,
+    payload: {
+      razorpay_order_id: string;
+      razorpay_payment_id: string;
+      razorpay_signature: string;
+    },
+  ) => {
+    try {
+      const response = await api.post(`/bookings/${id}/payment/razorpay/verify`, payload);
+      return normalizeBooking(getRequiredData(response?.data?.data, 'Verify Razorpay payment response is missing data'));
+    } catch (error) {
+      console.error('[booking:verifyRazorpayPayment]', error);
       throw error;
     }
   },

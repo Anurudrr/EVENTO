@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, UploadCloud, X } from 'lucide-react';
+import { Loader2, MapPin, UploadCloud, X } from 'lucide-react';
 import { SERVICE_CATEGORIES } from '../constants';
 import { AvailabilityEntry, Service } from '../types';
-import { FALLBACK_IMAGE_URL, getErrorMessage } from '../utils';
+import { FALLBACK_IMAGE_URL, getErrorMessage, getImageUrl } from '../utils';
 import { AvailabilityEditor } from './AvailabilityEditor';
+import { EventoMap } from './EventoMap';
 
 interface ServiceFormProps {
   initialData?: Service | null;
@@ -32,6 +33,16 @@ const normalizeExistingImage = (image: string) => {
   }
 };
 
+const toOptionalCoordinate = (value?: number) => {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return parsed;
+};
+
 export const ServiceForm: React.FC<ServiceFormProps> = ({ initialData, onSubmit, submitLabel }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -39,7 +50,12 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({ initialData, onSubmit,
   const [priceLabel, setPriceLabel] = useState('');
   const [category, setCategory] = useState(SERVICE_CATEGORIES[0]);
   const [location, setLocation] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [upiId, setUpiId] = useState('');
+  const [cancellationPolicy, setCancellationPolicy] = useState('');
+  const [refundPolicy, setRefundPolicy] = useState('');
+  const [serviceTerms, setServiceTerms] = useState('');
   const [availability, setAvailability] = useState<AvailabilityEntry[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [newImages, setNewImages] = useState<File[]>([]);
@@ -55,7 +71,12 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({ initialData, onSubmit,
     setPriceLabel(initialData.priceLabel || '');
     setCategory(initialData.category || SERVICE_CATEGORIES[0]);
     setLocation(initialData.location || '');
+    setLat(toOptionalCoordinate(initialData.lat));
+    setLng(toOptionalCoordinate(initialData.lng));
     setUpiId(initialData.upiId || '');
+    setCancellationPolicy(initialData.cancellationPolicy || '');
+    setRefundPolicy(initialData.refundPolicy || '');
+    setServiceTerms(initialData.serviceTerms || '');
     setExistingImages(initialData.rawImages || initialData.images || []);
     setAvailability(initialData.availability || []);
     setNewImages([]);
@@ -70,6 +91,11 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({ initialData, onSubmit,
   useEffect(() => () => {
     previewUrls.forEach((item) => URL.revokeObjectURL(item.url));
   }, [previewUrls]);
+
+  const selectedLocation = useMemo(
+    () => (lat !== null && lng !== null ? { lat, lng } : null),
+    [lat, lng],
+  );
 
   const handleRemoveExistingImage = (index: number) => {
     setExistingImages((current) => current.filter((_, itemIndex) => itemIndex !== index));
@@ -86,9 +112,23 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({ initialData, onSubmit,
     setNewImages((current) => [...current, ...files].slice(0, 6));
   };
 
+  const handleLocationSelect = (coordinates: { lat: number; lng: number }) => {
+    setLat(coordinates.lat);
+    setLng(coordinates.lng);
+    setError('');
+  };
+
   const validate = () => {
     if (!title.trim() || !description.trim() || !price || !location.trim()) {
       return 'Please complete all required service details.';
+    }
+
+    if ((lat === null) !== (lng === null)) {
+      return 'Latitude and longitude must be saved together.';
+    }
+
+    if (!initialData && (lat === null || lng === null)) {
+      return 'Pick a location on the map or use your current location.';
     }
 
     if (Number(price) < 0) {
@@ -119,8 +159,8 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({ initialData, onSubmit,
     }
 
     try {
-      const retainedImages = Array.from(
-        new Set(existingImages.map(normalizeExistingImage).filter(Boolean)),
+      const retainedImages: string[] = Array.from(
+        new Set(existingImages.map(normalizeExistingImage).filter((image): image is string => Boolean(image))),
       );
       const formData = new FormData();
       formData.append('title', title.trim());
@@ -129,7 +169,14 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({ initialData, onSubmit,
       formData.append('priceLabel', priceLabel.trim());
       formData.append('category', category);
       formData.append('location', location.trim());
+      if (selectedLocation) {
+        formData.append('lat', String(selectedLocation.lat));
+        formData.append('lng', String(selectedLocation.lng));
+      }
       formData.append('upiId', upiId.trim());
+      formData.append('cancellationPolicy', cancellationPolicy.trim());
+      formData.append('refundPolicy', refundPolicy.trim());
+      formData.append('serviceTerms', serviceTerms.trim());
       formData.append('availability', JSON.stringify(availability));
 
       retainedImages.forEach((image) => formData.append('images', image));
@@ -232,13 +279,91 @@ export const ServiceForm: React.FC<ServiceFormProps> = ({ initialData, onSubmit,
         </div>
       </div>
 
+      <div className="space-y-6 border-t border-noir-border pt-4">
+        <div>
+          <p className="ml-2 text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Trust and policy details</p>
+          <p className="mt-2 text-sm uppercase tracking-wide text-noir-muted">
+            These details appear on the public listing so buyers understand payment terms, cancellation rules, and service expectations before booking.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="ml-2 text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Cancellation Policy</label>
+          <textarea
+            value={cancellationPolicy}
+            onChange={(event) => setCancellationPolicy(event.target.value)}
+            placeholder="Example: Free cancellation up to 7 days before the event. Inside 7 days, the advance is non-refundable."
+            rows={3}
+            className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="ml-2 text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Refund Policy</label>
+          <textarea
+            value={refundPolicy}
+            onChange={(event) => setRefundPolicy(event.target.value)}
+            placeholder="Example: Approved refunds are processed to the original payment method within 5 to 7 working days."
+            rows={3}
+            className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="ml-2 text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Service Terms</label>
+          <textarea
+            value={serviceTerms}
+            onChange={(event) => setServiceTerms(event.target.value)}
+            placeholder="Example: Venue access, setup windows, deliverables, and overtime charges are confirmed before the event date."
+            rows={4}
+            className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-noir-ink focus:border-noir-accent focus:outline-none"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-5 border-t border-noir-border pt-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="ml-2 text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Venue pin</p>
+            <p className="mt-2 text-sm uppercase tracking-wide text-noir-muted">
+              Click the map or use browser geolocation to save exact event coordinates for public markers.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <div className="inline-flex items-center gap-2 border border-noir-border bg-noir-bg px-4 py-3 text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-ink">
+              <MapPin className="h-4 w-4 text-noir-accent" />
+              {selectedLocation
+                ? `${selectedLocation.lat.toFixed(5)}, ${selectedLocation.lng.toFixed(5)}`
+                : 'No pin selected'}
+            </div>
+          </div>
+        </div>
+
+        <EventoMap
+          selectable
+          selectedLocation={selectedLocation}
+          onLocationSelect={handleLocationSelect}
+          selectedLabel={location.trim() || title.trim() || 'Pinned venue'}
+          emptyMessage="Tap the map to place the venue marker."
+          height={360}
+        />
+      </div>
+
       <div className="space-y-4 border-t border-noir-border pt-4">
         <p className="mb-4 ml-2 text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Service images</p>
 
         <div className="flex flex-wrap gap-4">
           {existingImages.map((image, index) => (
             <div key={`existing-${index}`} className="relative h-24 w-24 border border-noir-border">
-              <img src={image || FALLBACK_IMAGE_URL} alt="Preview" className="h-full w-full object-cover" />
+              <img
+                src={getImageUrl(image)}
+                alt="Preview"
+                className="h-full w-full object-cover"
+                onError={(event) => {
+                  (event.target as HTMLImageElement).src = FALLBACK_IMAGE_URL;
+                }}
+              />
               <button type="button" onClick={() => handleRemoveExistingImage(index)} className="absolute right-1 top-1 bg-noir-ink p-1 text-noir-bg transition-colors hover:bg-rose-500">
                 <X className="h-4 w-4" />
               </button>

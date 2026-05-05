@@ -2,15 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const STORAGE_KEY = 'evento.loader.seen';
-const MIN_LOADER_DURATION_MS = 1450;
+const MAX_LOADER_DURATION_MS = 480;
 
-export const SiteLoader: React.FC = () => {
+export const SiteLoader: React.FC = React.memo(() => {
   const [visible, setVisible] = useState(() => {
     if (typeof window === 'undefined') {
       return true;
     }
 
-    return window.sessionStorage.getItem(STORAGE_KEY) !== '1';
+    return window.sessionStorage.getItem(STORAGE_KEY) !== '1'
+      && document.readyState !== 'complete';
   });
 
   useEffect(() => {
@@ -18,22 +19,16 @@ export const SiteLoader: React.FC = () => {
       return undefined;
     }
 
-    const startTime = window.performance.now();
-    let releaseTimer = 0;
     let fallbackTimer = 0;
 
     document.body.classList.add('overflow-hidden');
 
     const finish = () => {
-      const elapsed = window.performance.now() - startTime;
-      const remaining = Math.max(0, MIN_LOADER_DURATION_MS - elapsed);
-
-      window.clearTimeout(releaseTimer);
-      releaseTimer = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
         window.sessionStorage.setItem(STORAGE_KEY, '1');
         document.body.classList.remove('overflow-hidden');
         setVisible(false);
-      }, remaining);
+      });
     };
 
     if (document.readyState === 'complete') {
@@ -42,11 +37,10 @@ export const SiteLoader: React.FC = () => {
       window.addEventListener('load', finish, { once: true });
     }
 
-    fallbackTimer = window.setTimeout(finish, MIN_LOADER_DURATION_MS + 450);
+    fallbackTimer = window.setTimeout(finish, MAX_LOADER_DURATION_MS);
 
     return () => {
       window.removeEventListener('load', finish);
-      window.clearTimeout(releaseTimer);
       window.clearTimeout(fallbackTimer);
       document.body.classList.remove('overflow-hidden');
     };
@@ -58,14 +52,14 @@ export const SiteLoader: React.FC = () => {
         <motion.div
           className="site-loader"
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } }}
+          exit={{ opacity: 0, transition: { duration: 0.2, ease: 'easeOut' } }}
         >
           <div className="site-loader__grain" />
           <motion.div
             className="site-loader__content"
-            initial={{ opacity: 0, y: 32 }}
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
           >
             <span className="site-loader__eyebrow">Live marketplace for event experiences</span>
             <div className="site-loader__title">
@@ -76,7 +70,7 @@ export const SiteLoader: React.FC = () => {
               <motion.span
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
-                transition={{ duration: 1.15, ease: [0.65, 0, 0.35, 1] }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
               />
             </div>
           </motion.div>
@@ -84,4 +78,4 @@ export const SiteLoader: React.FC = () => {
       )}
     </AnimatePresence>
   );
-};
+});

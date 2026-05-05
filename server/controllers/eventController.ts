@@ -1,6 +1,45 @@
 import type { Request, Response, NextFunction } from 'express';
 import Event from '../models/Event.ts';
 
+const parseCoordinate = (value: unknown, min: number, max: number) => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    return undefined;
+  }
+
+  return parsed;
+};
+
+const resolveCoordinates = (payload: Record<string, unknown>) => {
+  const lat = parseCoordinate(payload.lat, -90, 90);
+  const lng = parseCoordinate(payload.lng, -180, 180);
+
+  return lat !== undefined && lng !== undefined
+    ? { lat, lng }
+    : {};
+};
+
+const haversineDistanceKm = (
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+) => {
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(destination.lat - origin.lat);
+  const dLng = toRadians(destination.lng - origin.lng);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(origin.lat))
+    * Math.cos(toRadians(destination.lat))
+    * Math.sin(dLng / 2) ** 2;
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 // @desc    Get all events
 // @route   GET /api/events
 // @access  Public
@@ -112,6 +151,59 @@ export const getEvents = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
+// @desc    Get nearby events
+// @route   GET /api/events/nearby
+// @access  Public
+export const getNearbyEvents = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lat = parseCoordinate(req.query.lat, -90, 90);
+    const lng = parseCoordinate(req.query.lng, -180, 180);
+    const radius = parseCoordinate(req.query.radius, 1, 5000) ?? 25;
+    const limit = Math.max(1, Math.min(Number(req.query.limit) || 10, 50));
+
+    if (lat === undefined || lng === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid lat and lng query parameters are required',
+      });
+    }
+
+    const events = await Event.find({
+      lat: { $type: 'number' },
+      lng: { $type: 'number' },
+    }).populate('createdBy', 'name email role profilePicture createdAt');
+
+    const nearbyEvents = events
+      .map((event) => {
+        const distanceKm = haversineDistanceKm(
+          { lat, lng },
+          { lat: event.lat, lng: event.lng },
+        );
+
+        return {
+          event,
+          distanceKm,
+        };
+      })
+      .filter((entry) => entry.distanceKm <= radius)
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, limit)
+      .map(({ event, distanceKm }) => ({
+        ...event.toObject(),
+        distanceKm: Number(distanceKm.toFixed(2)),
+      }));
+
+    res.status(200).json({
+      success: true,
+      count: nearbyEvents.length,
+      radiusKm: radius,
+      data: nearbyEvents,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Get single event
 // @route   GET /api/events/:id
 // @access  Public
@@ -141,6 +233,10 @@ export const createEvent = async (req: any, res: Response, next: NextFunction) =
     req.body.createdBy = req.user.id;
     req.body.availableSeats = req.body.availableSeats ?? req.body.totalSeats;
     req.body.images = Array.isArray(req.body.images) ? req.body.images : [];
+    req.body = {
+      ...req.body,
+      ...resolveCoordinates(req.body),
+    };
 
     const event = await Event.create(req.body);
 
@@ -173,6 +269,11 @@ export const updateEvent = async (req: any, res: Response, next: NextFunction) =
       const seatsDiff = req.body.totalSeats - event.totalSeats;
       req.body.availableSeats = Math.max(0, event.availableSeats + seatsDiff);
     }
+
+    req.body = {
+      ...req.body,
+      ...resolveCoordinates(req.body),
+    };
 
     event = await Event.findByIdAndUpdate(req.params.id, req.body, {
       new: true,

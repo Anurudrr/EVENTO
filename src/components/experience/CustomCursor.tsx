@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { motion, useMotionValue } from 'framer-motion';
+import { shouldEnablePointerEffects } from '../../utils/performance';
 
 const canUseInteractiveCursor = () => (
   typeof window !== 'undefined'
-  && window.matchMedia('(hover: hover) and (pointer: fine)').matches
-  && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  && shouldEnablePointerEffects()
 );
 
-export const CustomCursor: React.FC = () => {
+export const CustomCursor: React.FC = React.memo(() => {
   const [enabled, setEnabled] = useState(false);
   const [visible, setVisible] = useState(false);
   const [active, setActive] = useState(false);
@@ -21,6 +21,7 @@ export const CustomCursor: React.FC = () => {
     }
 
     const hoverMedia = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const desktopMedia = window.matchMedia('(min-width: 1024px)');
     const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     const updateEnabled = () => {
@@ -30,13 +31,29 @@ export const CustomCursor: React.FC = () => {
     updateEnabled();
 
     hoverMedia.addEventListener('change', updateEnabled);
+    desktopMedia.addEventListener('change', updateEnabled);
     reducedMotionMedia.addEventListener('change', updateEnabled);
+    window.addEventListener('resize', updateEnabled, { passive: true });
 
     return () => {
       hoverMedia.removeEventListener('change', updateEnabled);
+      desktopMedia.removeEventListener('change', updateEnabled);
       reducedMotionMedia.removeEventListener('change', updateEnabled);
+      window.removeEventListener('resize', updateEnabled);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return undefined;
+    }
+
+    document.body.classList.toggle('custom-cursor-enabled', enabled);
+
+    return () => {
+      document.body.classList.remove('custom-cursor-enabled');
+    };
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) {
@@ -53,13 +70,15 @@ export const CustomCursor: React.FC = () => {
     const handlePointerMove = (event: PointerEvent) => {
       pointerX.set(event.clientX);
       pointerY.set(event.clientY);
-      setVisible(true);
+      setVisible((current) => (current ? current : true));
     };
 
     const handlePointerOver = (event: PointerEvent) => {
       const cursorTarget = resolveCursorTarget(event.target);
-      setActive(Boolean(cursorTarget));
-      setLabel(cursorTarget?.dataset.cursor || '');
+      const nextActive = Boolean(cursorTarget);
+      const nextLabel = cursorTarget?.dataset.cursor || '';
+      setActive((current) => (current === nextActive ? current : nextActive));
+      setLabel((current) => (current === nextLabel ? current : nextLabel));
     };
 
     const handlePointerOut = (event: PointerEvent) => {
@@ -68,13 +87,13 @@ export const CustomCursor: React.FC = () => {
         return;
       }
 
-      setActive(false);
-      setLabel('');
+      setActive((current) => (current ? false : current));
+      setLabel((current) => (current ? '' : current));
     };
 
     const handleWindowLeave = (event: MouseEvent) => {
       if (event.relatedTarget === null) {
-        setVisible(false);
+        setVisible((current) => (current ? false : current));
       }
     };
 
@@ -117,4 +136,4 @@ export const CustomCursor: React.FC = () => {
       <div className="custom-cursor__label">{label || 'DRAG'}</div>
     </motion.div>
   );
-};
+});

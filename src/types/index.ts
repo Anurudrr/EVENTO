@@ -4,6 +4,7 @@ export type UserRole = 'user' | 'organizer' | 'admin';
 export type BookingStatus = 'pending' | 'confirmed' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
 export type PaymentStatus = 'pending' | 'failed' | 'paid_pending_verification' | 'verified';
 export type PaymentReviewStatus = 'pending' | 'confirmed' | 'rejected';
+export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
 export interface User {
   _id: string;
@@ -15,19 +16,20 @@ export interface User {
   emailVerified?: boolean;
   authProvider?: 'local' | 'google';
   upiId?: string;
+  businessName?: string;
+  businessType?: string;
+  businessLocation?: string;
+  responseTimeHours?: number;
+  verificationStatus?: VerificationStatus;
+  verificationNotes?: string;
+  verificationSubmittedAt?: string;
+  verifiedAt?: string;
   createdAt?: string;
 }
 
 export interface LoginCredentials {
   email: string;
   password?: string;
-}
-
-export interface SignupCredentials {
-  name: string;
-  email: string;
-  password?: string;
-  role: 'user' | 'organizer';
 }
 
 export type OtpPurpose = 'signup' | 'login';
@@ -38,6 +40,13 @@ export interface SendOtpPayload {
   name?: string;
   password?: string;
   role?: 'user' | 'organizer';
+}
+
+export interface SendOtpResponse {
+  success: boolean;
+  message: string;
+  expiresIn: number;
+  cooldownSeconds: number;
 }
 
 export interface VerifyOtpPayload {
@@ -58,6 +67,11 @@ export interface AvailabilityEntry {
   note?: string;
 }
 
+export interface ServiceLocation {
+  lat: number;
+  lng: number;
+}
+
 export interface Service {
   _id: string;
   title: string;
@@ -65,9 +79,14 @@ export interface Service {
   price: number;
   priceLabel?: string;
   location: string;
+  lat?: number;
+  lng?: number;
   images: string[];
   rawImages?: string[];
   upiId?: string;
+  cancellationPolicy?: string;
+  refundPolicy?: string;
+  serviceTerms?: string;
   organizer?: User | string;
   rating: number;
   reviews?: number;
@@ -117,6 +136,7 @@ export interface Booking {
   phone?: string;
   eventType: string;
   eventLocation?: string;
+  serviceLocation?: ServiceLocation;
   time: string;
   guests: number;
   notes: string;
@@ -222,6 +242,8 @@ export interface AdminOverview {
   summary: {
     users: number;
     organizers: number;
+    verifiedOrganizers: number;
+    pendingOrganizerReviews: number;
     services: number;
     bookings: number;
     payments: number;

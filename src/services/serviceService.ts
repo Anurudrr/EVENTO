@@ -2,28 +2,6 @@ import api from './api';
 import { Service, ServiceFilters } from '../types';
 import { normalizeService } from './normalizers';
 
-const describeFormData = (formData: FormData) => {
-  const payload: Record<string, unknown> = {};
-
-  formData.forEach((value, key) => {
-    const nextValue = typeof File !== 'undefined' && value instanceof File
-      ? { name: value.name, size: value.size, type: value.type }
-      : value;
-
-    const currentValue = payload[key];
-    if (currentValue === undefined) {
-      payload[key] = nextValue;
-      return;
-    }
-
-    payload[key] = Array.isArray(currentValue)
-      ? [...currentValue, nextValue]
-      : [currentValue, nextValue];
-  });
-
-  return payload;
-};
-
 export const serviceService = {
   getServices: async (filters: ServiceFilters = {}) => {
     try {
@@ -71,6 +49,21 @@ export const serviceService = {
     }
   },
 
+  getMappedServices: async (limit = 150) => {
+    try {
+      const response = await api.get('/services/map', {
+        params: {
+          limit,
+        },
+      });
+
+      return (response?.data?.data || []).map(normalizeService);
+    } catch (error) {
+      console.error('[service:get-mapped-services]', error);
+      throw error;
+    }
+  },
+
   createService: async (serviceData: FormData) => {
     try {
       const response = await api.post('/services', serviceData);
@@ -87,21 +80,10 @@ export const serviceService = {
 
   updateService: async (id: string, serviceData: FormData) => {
     try {
-      console.log('[service:update:request]', {
-        id,
-        payload: describeFormData(serviceData),
-      });
-
       const response = await api.put(`/services/${id}`, serviceData);
       if (!response?.data?.data) {
         throw new Error('Update service response is missing data');
       }
-
-      console.log('[service:update:response]', {
-        id,
-        status: response.status,
-        service: response.data.data,
-      });
 
       return normalizeService(response.data.data);
     } catch (error) {

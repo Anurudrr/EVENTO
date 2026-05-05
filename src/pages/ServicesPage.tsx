@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { MapPin, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { SERVICE_CATEGORIES } from '../constants';
+import { Seo } from '../components/Seo';
 import { ServiceCard } from '../components/ServiceCard';
 import { SceneSection } from '../components/experience/SceneSection';
 import { serviceService } from '../services/serviceService';
@@ -103,6 +104,17 @@ const ServicesPage: React.FC = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-noir-bg pt-24">
+      <Seo
+        title="Browse Event Services"
+        description="Filter EVENTO services by category, city, budget, and rating to find the right team for your next event."
+        path="/events"
+        structuredData={{
+          '@context': 'https://schema.org',
+          '@type': 'CollectionPage',
+          name: 'EVENTO Services',
+          description: 'Browse live event service listings on EVENTO.',
+        }}
+      />
       <section className="relative overflow-hidden border-b border-noir-border px-6 pb-16 pt-12 md:pb-24 md:pt-20">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(212,163,115,0.18),transparent_36%),radial-gradient(circle_at_80%_10%,rgba(27,36,47,0.12),transparent_28%)]" />
         <div className="absolute inset-0 noir-pattern opacity-10" />
@@ -130,7 +142,7 @@ const ServicesPage: React.FC = () => {
                 </h2>
               </div>
               <p>
-                Search results map directly to live service records, organizer profiles, booking forms, and the UPI payment system.
+                Search results map directly to live service records, organizer trust badges, booking forms, and secure checkout with fallback payment support.
               </p>
             </div>
           </div>
@@ -267,7 +279,7 @@ const ServicesPage: React.FC = () => {
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
               {services.map((service) => (
                 <div key={service._id} data-scene-reveal>
-                  <ServiceCard service={service} />
+                  <ServiceCard service={service} withEntryAnimation={false} />
                 </div>
               ))}
             </div>

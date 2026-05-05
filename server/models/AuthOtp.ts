@@ -2,6 +2,12 @@ import mongoose from 'mongoose';
 
 const authOtpSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
     email: {
       type: String,
       required: true,
@@ -16,6 +22,7 @@ const authOtpSchema = new mongoose.Schema(
     otpHash: {
       type: String,
       required: true,
+      select: false,
     },
     expiresAt: {
       type: Date,
@@ -24,14 +31,18 @@ const authOtpSchema = new mongoose.Schema(
     attempts: {
       type: Number,
       default: 0,
+      min: 0,
+      max: 3,
     },
-    maxAttempts: {
-      type: Number,
-      default: 5,
+    lastSentAt: {
+      type: Date,
+      default: Date.now,
+      required: true,
     },
     pendingName: {
       type: String,
       default: '',
+      trim: true,
     },
     pendingPasswordHash: {
       type: String,

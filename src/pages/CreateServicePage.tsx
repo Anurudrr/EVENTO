@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { serviceService } from '../services/serviceService';
@@ -26,7 +26,7 @@ const CreateServicePage: React.FC = () => {
       <div className="max-w-4xl space-y-8">
         <div>
           <h1 className="text-3xl font-display font-semibold text-noir-ink uppercase tracking-wide mb-3">Create service</h1>
-          <p className="text-noir-muted uppercase tracking-normal">Publish a new organizer service with pricing and portfolio images.</p>
+          <p className="text-noir-muted uppercase tracking-normal">Publish a new organizer service with pricing, portfolio images, and a pinned venue map.</p>
         </div>
 
         <ServiceForm onSubmit={handleCreate} submitLabel="Publish service" />

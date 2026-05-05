@@ -4,7 +4,13 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
+.env
+.env.*
 !.env.example
+*.txt
+.vercel.env
+.vercel-env-tmp/
+.dev-mail/
+uploads/
 
 .vercel

@@ -10,20 +10,9 @@ import {
   toggleWishlist,
 } from '../controllers/userController.ts';
 import { protect } from '../middleware/authMiddleware.ts';
+import { checkImageFile } from '../utils/upload.ts';
 
 const router = express.Router();
-
-const checkImageFile = (file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedTypes = /jpeg|jpg|png/;
-  const hasValidExtension = allowedTypes.test(file.originalname.split('.').pop()?.toLowerCase() || '');
-  const hasValidMimeType = allowedTypes.test(file.mimetype);
-
-  if (hasValidExtension && hasValidMimeType) {
-    return cb(null, true);
-  }
-
-  cb(new Error('Images only!'));
-};
 
 const upload = multer({
   storage: multer.memoryStorage(),

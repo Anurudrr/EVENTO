@@ -1,50 +1,52 @@
 import React from 'react';
 import { ArrowUpRight, MapPin, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PORTFOLIO_IMAGE_PATHS } from '../constants/images';
+import { FALLBACK_IMAGE_URL } from '../utils';
 
-export const Portfolio: React.FC = () => {
+export const Portfolio: React.FC = React.memo(() => {
   const projects = React.useMemo(() => [
-    { 
-      title: 'The Ethereal Wedding', 
-      category: 'Celebration', 
-      img: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=1200',
+    {
+      title: 'The Ethereal Wedding',
+      category: 'Celebration',
+      img: PORTFOLIO_IMAGE_PATHS[0],
       location: 'Tuscany, Italy',
-      year: '2024'
+      year: '2024',
     },
-    { 
-      title: 'Floral Garden Gala', 
-      category: 'Social', 
-      img: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=1200',
+    {
+      title: 'Floral Garden Gala',
+      category: 'Social',
+      img: PORTFOLIO_IMAGE_PATHS[1],
       location: 'Provence, France',
-      year: '2024'
+      year: '2024',
     },
-    { 
-      title: 'Artistic Bloom Expo', 
-      category: 'Exhibition', 
-      img: 'https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&q=80&w=1200',
+    {
+      title: 'Artistic Bloom Expo',
+      category: 'Exhibition',
+      img: PORTFOLIO_IMAGE_PATHS[2],
       location: 'Kyoto, Japan',
-      year: '2023'
+      year: '2023',
     },
-    { 
-      title: 'Parisian Spring Soirée', 
-      category: 'Social', 
-      img: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=1200',
+    {
+      title: 'Parisian Spring Soiree',
+      category: 'Social',
+      img: PORTFOLIO_IMAGE_PATHS[3],
       location: 'Paris, France',
-      year: '2023'
+      year: '2023',
     },
-    { 
-      title: 'Midnight Jazz Lounge', 
-      category: 'Music', 
-      img: 'https://images.unsplash.com/photo-1514525253361-bee8718a340b?auto=format&fit=crop&q=80&w=1200',
+    {
+      title: 'Midnight Jazz Lounge',
+      category: 'Music',
+      img: PORTFOLIO_IMAGE_PATHS[4],
       location: 'New Orleans, USA',
-      year: '2023'
+      year: '2023',
     },
-    { 
-      title: 'Tech Summit 2024', 
-      category: 'Corporate', 
-      img: 'https://images.unsplash.com/photo-1540575861501-7ad05823c951?auto=format&fit=crop&q=80&w=1200',
+    {
+      title: 'Tech Summit 2024',
+      category: 'Corporate',
+      img: PORTFOLIO_IMAGE_PATHS[5],
       location: 'San Francisco, USA',
-      year: '2024'
+      year: '2024',
     },
   ], []);
 
@@ -72,21 +74,21 @@ export const Portfolio: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20">
-          {projects.map((project, i) => (
-            <div 
-              key={i}
-              className="group cursor-pointer"
-            >
+          {projects.map((project, index) => (
+            <div key={index} className="group cursor-pointer">
               <div className="relative aspect-[16/10] rounded-none overflow-hidden mb-8 border border-noir-border shadow-[0_60px_120px_-30px_rgba(212,163,115,0.1)]">
-                <img 
-                  src={project.img} 
+                <img
+                  src={project.img}
                   alt={project.title}
                   className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
                   loading="lazy"
+                  decoding="async"
+                  onError={(event) => {
+                    (event.target as HTMLImageElement).src = FALLBACK_IMAGE_URL;
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-white/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
+
                 <div className="absolute top-12 right-12">
                   <div className="w-20 h-20 rounded-none bg-noir-accent flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-2xl">
                     <ArrowUpRight className="w-10 h-10" />
@@ -114,11 +116,10 @@ export const Portfolio: React.FC = () => {
           ))}
         </div>
       </div>
-      
-      {/* Decorative Background Text */}
+
       <div className="absolute -bottom-40 -right-40 pointer-events-none opacity-[0.02] select-none">
         <h2 className="text-[30vw] font-display font-semibold text-noir-ink leading-snug tracking-wide uppercase">PORTFOLIO</h2>
       </div>
     </section>
   );
-};
+});

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Minus, Search, HelpCircle, Sparkles, MessageCircle, ArrowRight, Info } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Seo } from '../components/Seo';
 
 const FAQPage: React.FC = () => {
   const [activeIndex, setActiveIndex] = useState<number | null>(0);
@@ -9,23 +11,23 @@ const FAQPage: React.FC = () => {
   const faqs = [
     {
       question: "How do I book an event on EVENTO?",
-      answer: "Simply browse our categories, find an event you like, select the number of seats, and click 'Book Now'. You'll be guided through our secure booking process."
+      answer: "Browse the marketplace, open a service page, review the pricing and policies, then submit your date, location, guest count, and requirements. EVENTO creates the booking first and then takes you into the payment flow."
     },
     {
       question: "Are the organizers on EVENTO verified?",
-      answer: "Yes, every organizer on our platform undergoes a strict vetting process, including identity verification, event history review, and business license checks."
+      answer: "Organizers can submit business and payout details for review. Listings show whether the organizer is verified, pending review, or still unverified, so you can see the status before you book."
     },
     {
       question: "What is the cancellation policy?",
-      answer: "Cancellation policies vary by event and organizer. You can find the specific policy on each event detail page before booking."
+      answer: "Each service can publish its own cancellation, refund, and service terms. Those policies now appear on the service detail page before payment so buyers can review them up front."
     },
     {
       question: "How do I pay for my booking?",
-      answer: "We support all major credit cards, PayPal, and regional payment methods through our secure EVENTO Pay system."
+      answer: "EVENTO now supports automated Razorpay checkout when it is configured for the environment, with UPI payment fallback for organizers that accept direct UPI collection."
     },
     {
       question: "Can I contact an organizer before booking?",
-      answer: "Absolutely! Every event page has a 'Contact Organizer' button that allows you to chat directly with the professional."
+      answer: "You can use the organizer email link on the service page before booking. Direct pre-book inquiry chat is not live yet."
     }
   ];
 
@@ -41,6 +43,11 @@ const FAQPage: React.FC = () => {
       exit={{ opacity: 0 }}
       className="pt-32 bg-noir-bg min-h-screen overflow-hidden relative"
     >
+      <Seo
+        title="Marketplace FAQ"
+        description="Get answers about EVENTO booking flows, organizer verification, payment options, cancellation policies, and support."
+        path="/faq"
+      />
       {/* Background Decorative Elements */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] right-[-5%] w-[50%] h-[60%] bg-noir-accent/5 rounded-full blur-[120px]" />
@@ -161,10 +168,10 @@ const FAQPage: React.FC = () => {
               <p className="text-noir-muted text-xl mb-12 max-w-2xl mx-auto font-light leading-relaxed uppercase tracking-normal">
                 Our support team is always ready to help you with any inquiries, issues, or custom requests you might have.
               </p>
-              <button className="btn-noir !py-6 !px-16 !text-lg !rounded-none shadow-2xl shadow-noir-accent/20 flex items-center gap-4">
+              <Link to="/contact" className="btn-noir !py-6 !px-16 !text-lg !rounded-none shadow-2xl shadow-noir-accent/20 flex items-center gap-4">
                 Contact Support
                 <ArrowRight className="w-6 h-6" />
-              </button>
+              </Link>
             </div>
           </motion.div>
         </div>

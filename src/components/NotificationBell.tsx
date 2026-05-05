@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,7 @@ interface NotificationBellProps {
   panelClassName?: string;
 }
 
-export const NotificationBell: React.FC<NotificationBellProps> = ({
+export const NotificationBell: React.FC<NotificationBellProps> = React.memo(({
   buttonClassName = '',
   panelClassName = '',
 }) => {
@@ -23,7 +23,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -33,18 +33,51 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     } catch (error) {
       console.error('[notification-bell:load]', error);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
 
     void loadNotifications();
-    const intervalId = window.setInterval(() => {
-      void loadNotifications();
-    }, 20000);
+    let intervalId = 0;
 
-    return () => window.clearInterval(intervalId);
-  }, [user?._id]);
+    const stopPolling = () => {
+      if (intervalId) {
+        window.clearInterval(intervalId);
+        intervalId = 0;
+      }
+    };
+
+    const startPolling = () => {
+      stopPolling();
+
+      if (document.hidden) {
+        return;
+      }
+
+      intervalId = window.setInterval(() => {
+        void loadNotifications();
+      }, 20000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+        return;
+      }
+
+      void loadNotifications();
+      startPolling();
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadNotifications, user]);
 
   const handleNotificationClick = async (notification: NotificationItem) => {
     try {
@@ -149,4 +182,4 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       )}
     </div>
   );
-};
+});

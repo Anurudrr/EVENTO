@@ -9,6 +9,8 @@ type AppErrorBoundaryState = {
 };
 
 export class AppErrorBoundary extends React.Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
+  declare props: Readonly<AppErrorBoundaryProps>;
+
   state: AppErrorBoundaryState = {
     errorMessage: null,
   };

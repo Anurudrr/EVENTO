@@ -1,29 +1,30 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Globe2, Zap, ShieldCheck, Sparkles, Quote } from 'lucide-react';
+import { STATIC_EVENT_IMAGES } from '../constants/images';
 import { FALLBACK_IMAGE_URL } from '../utils';
 
-export const Values: React.FC = () => {
+export const Values: React.FC = React.memo(() => {
   const values = React.useMemo(() => [
-    { 
-      title: 'Global Standards', 
+    {
+      title: 'Global Standards',
       desc: 'We adhere to international event management protocols, ensuring consistency and quality across all regions.',
-      icon: <Globe2 className="w-8 h-8" />
+      icon: <Globe2 className="w-8 h-8" />,
     },
-    { 
-      title: 'Rapid Execution', 
+    {
+      title: 'Rapid Execution',
       desc: 'Our streamlined processes and elite partner network allow us to move from concept to execution with unmatched speed.',
-      icon: <Zap className="w-8 h-8" />
+      icon: <Zap className="w-8 h-8" />,
     },
-    { 
-      title: 'Unrivaled Security', 
+    {
+      title: 'Unrivaled Security',
       desc: 'From data privacy to physical event security, we prioritize the safety and confidentiality of our clients and guests.',
-      icon: <ShieldCheck className="w-8 h-8" />
+      icon: <ShieldCheck className="w-8 h-8" />,
     },
-    { 
-      title: 'Precision Planning', 
+    {
+      title: 'Precision Planning',
       desc: 'Every detail is meticulously documented and managed through our proprietary platform for flawless delivery.',
-      icon: <CheckCircle2 className="w-8 h-8" />
+      icon: <CheckCircle2 className="w-8 h-8" />,
     },
   ], []);
 
@@ -32,7 +33,7 @@ export const Values: React.FC = () => {
       <div className="container mx-auto">
         <div className="grid lg:grid-cols-2 gap-24 items-center">
           <div>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
@@ -46,17 +47,17 @@ export const Values: React.FC = () => {
               <span className="text-gradient-noir italic font-serif font-light">Timeless Grace.</span>
             </h2>
             <p className="text-xl md:text-2xl text-noir-muted leading-relaxed mb-16 max-w-2xl font-light tracking-normal">
-              We've redefined event management by combining high-end artistry with rigorous professional standards. Our platform is designed to handle the complexity of modern, international events.
+              We&apos;ve redefined event management by combining high-end artistry with rigorous professional standards. Our platform is designed to handle the complexity of modern, international events.
             </p>
-            
+
             <div className="grid sm:grid-cols-2 gap-10">
-              {values.map((value, i) => (
+              {values.map((value, index) => (
                 <motion.div
                   key={value.title}
                   initial={{ opacity: 0, x: -24 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true, amount: 0.25 }}
-                  transition={{ delay: i * 0.08, duration: 0.55, ease: 'easeOut' }}
+                  transition={{ delay: index * 0.08, duration: 0.55, ease: 'easeOut' }}
                   className="flex flex-col gap-6 group"
                 >
                   <div className="w-20 h-20 rounded-none bg-noir-accent/10 border border-noir-accent/20 flex items-center justify-center text-noir-accent shadow-2xl group-hover:bg-noir-accent group-hover:text-white transition-all duration-500">
@@ -73,11 +74,10 @@ export const Values: React.FC = () => {
 
           <div className="relative">
             <div className="relative z-10 rounded-none overflow-hidden shadow-[0_60px_120px_-30px_rgba(212,163,115,0.15)] border-[20px] border-white hover-float">
-              <img 
-                src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200" 
+              <img
+                src={STATIC_EVENT_IMAGES.values}
                 alt="Global Excellence"
                 className="w-full h-auto aspect-[4/5] object-cover transition-all duration-700 image-safe"
-                referrerPolicy="no-referrer"
                 loading="lazy"
                 decoding="async"
                 onError={(event) => {
@@ -86,9 +86,8 @@ export const Values: React.FC = () => {
               />
               <div className="absolute inset-0 bg-gradient-to-tr from-noir-bg/20 to-transparent" />
             </div>
-            
-            {/* Floating Quote */}
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -98,7 +97,7 @@ export const Values: React.FC = () => {
               <div className="w-16 h-16 rounded-none bg-noir-accent/10 flex items-center justify-center text-noir-accent mb-6">
                 <Quote className="w-8 h-8 fill-current" />
               </div>
-              <p className="text-noir-ink font-serif font-light italic text-xl md:text-2xl leading-relaxed mb-8 tracking-normal">"EVENTO has transformed how we approach our international summits. Their precision is unmatched."</p>
+              <p className="text-noir-ink font-serif font-light italic text-xl md:text-2xl leading-relaxed mb-8 tracking-normal">&quot;EVENTO has transformed how we approach our international summits. Their precision is unmatched.&quot;</p>
               <div className="flex items-center gap-6">
                 <div className="w-16 h-16 rounded-none bg-noir-accent flex items-center justify-center text-white font-semibold text-xl shadow-inner">SJ</div>
                 <div>
@@ -108,7 +107,6 @@ export const Values: React.FC = () => {
               </div>
             </motion.div>
 
-            {/* Decorative Elements */}
             <div className="absolute -top-32 -left-32 w-96 h-96 bg-noir-accent/5 rounded-full blur-[120px] -z-10" />
             <div className="absolute -bottom-32 -right-32 w-[30rem] h-[30rem] bg-noir-accent/5 rounded-full blur-[150px] -z-10" />
           </div>
@@ -116,4 +114,4 @@ export const Values: React.FC = () => {
       </div>
     </section>
   );
-};
+});

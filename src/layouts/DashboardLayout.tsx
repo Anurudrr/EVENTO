@@ -16,8 +16,10 @@ import {
   Shield,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Avatar } from '../components/ui/Avatar';
 import { NotificationBell } from '../components/NotificationBell';
+import { resetStoredPermissionDecisions } from '../utils/permissions';
 
 interface SidebarItem {
   icon: any;
@@ -27,6 +29,7 @@ interface SidebarItem {
 
 export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
+  const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -57,8 +60,14 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       : buyerItems;
 
   const handleLogout = () => {
-    logout();
-    navigate('/');
+    void logout().finally(() => {
+      navigate('/');
+    });
+  };
+
+  const handleResetPermissions = () => {
+    resetStoredPermissionDecisions();
+    showToast('Browser permission choices reset', 'info');
   };
 
   return (
@@ -185,7 +194,11 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
                 buttonClassName="relative flex h-12 w-12 items-center justify-center rounded-none border border-noir-border bg-noir-card text-noir-accent shadow-sm transition-colors hover:border-noir-accent"
                 panelClassName="bg-noir-card"
               />
-              <button className="w-12 h-12 rounded-none bg-noir-card border border-noir-border flex items-center justify-center text-noir-accent hover:border-noir-accent transition-colors shadow-sm">
+              <button
+                onClick={handleResetPermissions}
+                className="w-12 h-12 rounded-none bg-noir-card border border-noir-border flex items-center justify-center text-noir-accent hover:border-noir-accent transition-colors shadow-sm"
+                title="Reset saved browser permission choices"
+              >
                 <Settings className="w-5 h-5" />
               </button>
               

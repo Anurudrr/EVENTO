@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Send, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Seo } from '../components/Seo';
 import { contactService } from '../services/contactService';
 import { getErrorMessage } from '../utils';
 
@@ -44,6 +45,11 @@ const ContactPage: React.FC = () => {
 
   return (
     <div className="pt-20 bg-noir-bg min-h-screen relative overflow-hidden">
+      <Seo
+        title="Contact EVENTO"
+        description="Contact EVENTO for booking support, organizer questions, payment issues, or marketplace help."
+        path="/contact"
+      />
       {/* Background Decorative Elements */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] right-[-5%] w-[50%] h-[60%] bg-noir-accent/5 rounded-full blur-[120px]" />
@@ -75,9 +81,9 @@ const ContactPage: React.FC = () => {
             {/* Contact Info */}
             <div className="space-y-8">
               {[
-                { icon: Phone, title: 'Call Us', detail: '+1 (800) EVENTO-GLOBAL', desc: 'Mon-Fri from 9am to 6pm.' },
-                { icon: Mail, title: 'Email Support', detail: 'hello@evento.com', desc: 'We usually reply within 24h.' },
-                { icon: MapPin, title: 'Global HQ', detail: '123 Celebration Way, NY', desc: 'Visit our creative studio.' },
+                { icon: Phone, title: 'Call Us', detail: '+91 7389382433', desc: 'Support hours vary by booking load and review queue.' },
+                { icon: Mail, title: 'Email Support', detail: 'sanurudh938@gmail.com', desc: 'Share your booking reference for faster help.' },
+                { icon: MapPin, title: 'Operating Base', detail: 'Vadodara, Gujarat', desc: 'Organizer and marketplace support are coordinated from India.' },
               ].map((item, i) => (
                 <motion.div
                   key={i}

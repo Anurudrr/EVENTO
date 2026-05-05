@@ -1,6 +1,7 @@
 import type { Response, NextFunction } from 'express';
 import Notification from '../models/Notification.ts';
 import { isSmokeTestNotification } from '../utils/smokeArtifacts.ts';
+import { subscribeToNotificationStream } from '../utils/notificationStream.ts';
 
 export const getNotifications = async (req: any, res: Response, next: NextFunction) => {
   try {
@@ -66,6 +67,23 @@ export const markAllNotificationsRead = async (req: any, res: Response, next: Ne
     res.status(200).json({
       success: true,
       data: {},
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const streamNotifications = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    const unsubscribe = subscribeToNotificationStream(req.user.id, res);
+
+    req.on('close', () => {
+      unsubscribe();
     });
   } catch (err) {
     next(err);

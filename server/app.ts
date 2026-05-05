@@ -1,7 +1,6 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
 import express from 'express';
-import dotenv from 'dotenv';
 import morgan from 'morgan';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -19,24 +18,52 @@ import serviceRoutes from './routes/serviceRoutes.ts';
 import chatRoutes from './routes/chatRoutes.ts';
 import notificationRoutes from './routes/notificationRoutes.ts';
 import adminRoutes from './routes/adminRoutes.ts';
+import plannerRoutes from './routes/plannerRoutes.ts';
+import telemetryRoutes from './routes/telemetryRoutes.ts';
+import {
+  getCorsOrigins,
+  getRateLimitConfig,
+  isDevelopmentEnv,
+  isProductionEnv,
+} from './utils/env.ts';
 
-
-dotenv.config();
-
-// Do NOT call getJwtSecret()/getMongoUri() here at module level —
-// a missing env var would throw and permanently crash the Vercel function.
+// Do not call getJwtSecret()/getMongoUri() here at module level.
+// A missing env var would throw and permanently crash the Vercel function.
 
 let dbPromise: Promise<void> | null = null;
+let databaseConnected = false;
+let databaseError: Error | null = null;
+
+const normalizeDatabaseError = (error: unknown) => (
+  error instanceof Error ? error : new Error('Unknown database connection error')
+);
+
+export const getDatabaseStatus = () => ({
+  connected: databaseConnected,
+  error: databaseError,
+});
 
 export const ensureDatabaseConnection = async () => {
+  if (databaseConnected) {
+    return;
+  }
+
   if (!dbPromise) {
-    dbPromise = connectDB();
+    dbPromise = connectDB()
+      .then(() => {
+        databaseConnected = true;
+        databaseError = null;
+      })
+      .catch((error) => {
+        databaseConnected = false;
+        databaseError = normalizeDatabaseError(error);
+        throw databaseError;
+      });
   }
 
   try {
     await dbPromise;
   } catch (err) {
-    // Reset so the next request gets a fresh connection attempt
     dbPromise = null;
     throw err;
   }
@@ -54,6 +81,23 @@ const log = (scope: string, message: string, details?: Record<string, unknown>) 
 export const createApp = () => {
   const app = express();
   const rootDir = path.resolve();
+  const apiLimiter = rateLimit({
+    ...getRateLimitConfig(),
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method),
+  });
+  const getHealthPayload = () => {
+    const dbStatus = getDatabaseStatus();
+
+    return {
+      success: true,
+      status: 'ok',
+      uptime: process.uptime(),
+      database: dbStatus.connected ? 'connected' : 'unavailable',
+      ...(dbStatus.error && isDevelopmentEnv() ? { databaseMessage: dbStatus.error.message } : {}),
+    };
+  };
 
   app.set('trust proxy', 1);
   app.use(express.json());
@@ -69,7 +113,7 @@ export const createApp = () => {
     next();
   });
 
-  if (process.env.NODE_ENV?.trim() === 'development') {
+  if (isDevelopmentEnv()) {
     app.use(morgan('dev'));
   }
 
@@ -78,22 +122,34 @@ export const createApp = () => {
   }));
 
   app.use(cors({
-    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : true,
+    origin: getCorsOrigins(),
     credentials: true,
   }));
 
-  const limiter = rateLimit({
-    windowMs: (parseInt(process.env.RATE_LIMIT_WINDOW as string, 10) || 15) * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_MAX as string, 10) || 100,
-  });
-  app.use('/api', limiter);
+  app.use('/api', apiLimiter);
 
   app.get('/health', (req, res) => {
-    res.status(200).json({ success: true, status: 'ok', uptime: process.uptime() });
+    res.status(200).json(getHealthPayload());
   });
 
   app.get('/api/health', (req, res) => {
-    res.status(200).json({ success: true, status: 'ok', uptime: process.uptime() });
+    res.status(200).json(getHealthPayload());
+  });
+
+  app.use('/api', (req, res, next) => {
+    const dbStatus = getDatabaseStatus();
+
+    if (dbStatus.connected) {
+      next();
+      return;
+    }
+
+    res.status(503).json({
+      success: false,
+      error: isDevelopmentEnv()
+        ? `Database unavailable. ${dbStatus.error?.message || 'Set MONGO_URI in your .env and restart the server.'}`
+        : 'Service temporarily unavailable. Please try again later.',
+    });
   });
 
   app.use('/api/auth', authRoutes);
@@ -108,6 +164,8 @@ export const createApp = () => {
   app.use('/api/chats', chatRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/planner', plannerRoutes);
+  app.use('/api/telemetry', telemetryRoutes);
   app.use('/uploads', express.static(path.join(rootDir, 'uploads')));
 
   app.use(errorHandler);
@@ -117,7 +175,7 @@ export const createApp = () => {
 
 export const configureFrontend = async (app: express.Express) => {
   const rootDir = path.resolve();
-  const isProduction = process.env.NODE_ENV?.trim() === 'production';
+  const isProduction = isProductionEnv();
 
   if (isProduction) {
     const distPath = path.join(process.cwd(), 'dist');

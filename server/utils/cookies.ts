@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import generateToken from './generateToken.ts';
-import { getJwtCookieName, getJwtExpire } from './env.ts';
+import { getJwtCookieName, getJwtExpire, isProductionEnv } from './env.ts';
 
 const parseDurationToMs = (value: string) => {
   const normalized = value.trim().toLowerCase();
@@ -47,7 +47,7 @@ export const setAuthCookie = (res: Response, userId: string, role: string) => {
 
   res.cookie(cookieName, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV?.trim() === 'production',
+    secure: isProductionEnv(),
     sameSite: 'lax',
     maxAge,
     path: '/',
@@ -59,7 +59,7 @@ export const setAuthCookie = (res: Response, userId: string, role: string) => {
 export const clearAuthCookie = (res: Response) => {
   res.clearCookie(getJwtCookieName(), {
     httpOnly: true,
-    secure: process.env.NODE_ENV?.trim() === 'production',
+    secure: isProductionEnv(),
     sameSite: 'lax',
     path: '/',
   });

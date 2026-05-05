@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getEvents,
   getEvent,
+  getNearbyEvents,
   createEvent,
   updateEvent,
   deleteEvent,
@@ -10,6 +11,8 @@ import { protect, authorize } from '../middleware/authMiddleware.ts';
 import { validateEvent } from '../middleware/validationMiddleware.ts';
 
 const router = express.Router();
+
+router.get('/nearby', getNearbyEvents);
 
 router.route('/').get(getEvents).post(protect, authorize('organizer', 'admin'), validateEvent, createEvent);
 

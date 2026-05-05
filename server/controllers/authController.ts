@@ -4,9 +4,16 @@ import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.ts';
 import AuthOtp from '../models/AuthOtp.ts';
-import { getGoogleClientId, getOtpSecret } from '../utils/env.ts';
+import {
+  getEmailTransportConfig,
+  getGoogleClientId,
+  isDirectRegistrationEnabled,
+  isProductionEnv,
+} from '../utils/env.ts';
 import { clearAuthCookie, setAuthCookie } from '../utils/cookies.ts';
 import { sendOtpEmail } from '../utils/mailer.ts';
+
+type OtpPurpose = 'signup' | 'login';
 
 const buildAuthPayload = (user: any) => ({
   _id: user._id,
@@ -26,26 +33,47 @@ const getPublicRegistrationRole = (role: unknown) => (
 );
 
 const OTP_EXPIRY_MINUTES = 5;
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
+const OTP_MAX_ATTEMPTS = 3;
+const OTP_BCRYPT_ROUNDS = 10;
+const GENERIC_OTP_SEND_MESSAGE = 'If the details are valid, a verification code has been sent.';
+const GENERIC_OTP_INVALID_MESSAGE = 'The verification code is invalid or has expired.';
+const GENERIC_OTP_LOCKED_MESSAGE = 'Too many invalid attempts. Request a new verification code.';
 const googleClient = new OAuth2Client();
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
-const logAuth = (scope: string, message: string, details?: Record<string, unknown>) => {
-  if (details) {
-    console.log(`[auth:${scope}] ${message}`, details);
-    return;
+const createOtp = () => crypto.randomInt(100000, 1000000).toString();
+const getOtpExpiryDate = () => new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+const buildOtpResponse = (message = GENERIC_OTP_SEND_MESSAGE) => ({
+  success: true,
+  message,
+  expiresIn: OTP_EXPIRY_MINUTES * 60,
+  cooldownSeconds: OTP_RESEND_COOLDOWN_SECONDS,
+});
+const getOtpDeliveryMessage = () => {
+  if (getEmailTransportConfig()) {
+    return GENERIC_OTP_SEND_MESSAGE;
   }
 
-  console.log(`[auth:${scope}] ${message}`);
+  return isProductionEnv()
+    ? GENERIC_OTP_SEND_MESSAGE
+    : `${GENERIC_OTP_SEND_MESSAGE} In local development without SMTP, check .dev-mail/otp-outbox/.`;
 };
 
-const hashOtp = (email: string, purpose: 'signup' | 'login', otp: string) => {
-  return crypto
-    .createHmac('sha256', getOtpSecret())
-    .update(`${normalizeEmail(email)}:${purpose}:${otp}`)
-    .digest('hex');
+const getCooldownSecondsRemaining = (lastSentAt: Date | null | undefined) => {
+  if (!lastSentAt) {
+    return 0;
+  }
+
+  const retryAt = lastSentAt.getTime() + (OTP_RESEND_COOLDOWN_SECONDS * 1000);
+  const remainingMs = retryAt - Date.now();
+
+  return remainingMs > 0 ? Math.ceil(remainingMs / 1000) : 0;
 };
 
-const createOtp = () => crypto.randomInt(100000, 1000000).toString();
+const isOtpRequestEligible = (purpose: OtpPurpose, existingUser: any) => (
+  purpose === 'signup' ? !existingUser : Boolean(existingUser)
+);
 
 const respondWithAuth = (res: Response, user: any, status = 200) => {
   const token = setAuthCookie(res, user._id.toString(), user.role);
@@ -62,6 +90,13 @@ const respondWithAuth = (res: Response, user: any, status = 200) => {
 // @access  Public
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (!isDirectRegistrationEnabled()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Direct registration is disabled. Use the OTP signup flow to create an account.',
+      });
+    }
+
     const { name, password, role } = req.body;
     const email = normalizeEmail(req.body.email);
     const publicRole = getPublicRegistrationRole(role);
@@ -94,12 +129,10 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const password = req.body.password;
     const email = normalizeEmail(req.body.email);
 
-    // Validate email & password
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'Please provide an email and password' });
     }
 
-    // Check for user
     const user: any = await User.findOne({ email }).select('+password');
 
     if (!user) {
@@ -110,7 +143,6 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       return res.status(400).json({ success: false, error: 'Password login is not available for this account' });
     }
 
-    // Check if password matches
     const isMatch = await user.matchPassword(password);
 
     if (!isMatch) {
@@ -135,96 +167,65 @@ export const sendOtp = async (req: Request, res: Response, next: NextFunction) =
     }
 
     const { purpose, name, password, role } = req.body as {
-      purpose: 'signup' | 'login';
+      purpose: OtpPurpose;
       name?: string;
       password?: string;
       role?: 'user' | 'organizer';
     };
     const email = normalizeEmail(rawEmail);
     const publicRole = getPublicRegistrationRole(role);
-    const requestId = crypto.randomUUID();
+    const existingUser = await User.findOne({ email }).select('name');
+    const existingOtpRecord: any = await AuthOtp.findOne({ email, purpose });
+    const cooldownSeconds = getCooldownSecondsRemaining(existingOtpRecord?.lastSentAt);
 
-    logAuth('send-otp', 'Request received.', {
-      requestId,
-      email,
-      purpose,
-      ip: req.ip,
-      userAgent: req.get('user-agent'),
-    });
-
-    const existingUser = await User.findOne({ email }).select('+password');
-
-    logAuth('send-otp', 'User lookup completed.', {
-      requestId,
-      userExists: Boolean(existingUser),
-    });
-
-    if (purpose === 'signup' && existingUser) {
-      logAuth('send-otp', 'Signup blocked because account already exists.', { requestId, email });
-      return res.status(400).json({ success: false, error: 'An account with this email already exists' });
-    }
-
-    if (purpose === 'login' && !existingUser) {
-      logAuth('send-otp', 'Login blocked because account was not found.', { requestId, email });
-      return res.status(404).json({ success: false, error: 'No account found for this email' });
+    if (cooldownSeconds > 0) {
+      return res.status(429).json({
+        success: false,
+        error: 'Please wait before requesting another verification code.',
+        cooldownSeconds,
+      });
     }
 
     const otp = createOtp();
-    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-    const pendingPasswordHash = purpose === 'signup' && password
+    const otpHash = await bcrypt.hash(otp, OTP_BCRYPT_ROUNDS);
+    const expiresAt = getOtpExpiryDate();
+    const isEligibleRequest = isOtpRequestEligible(purpose, existingUser);
+    const pendingPasswordHash = purpose === 'signup' && isEligibleRequest && password
       ? await bcrypt.hash(password, 10)
       : '';
 
     await AuthOtp.findOneAndUpdate(
       { email, purpose },
       {
+        userId: purpose === 'login' ? existingUser?._id || null : null,
         email,
         purpose,
-        otpHash: hashOtp(email, purpose, otp),
+        otpHash,
         expiresAt,
         attempts: 0,
-        maxAttempts: 5,
-        pendingName: purpose === 'signup' ? name : '',
+        lastSentAt: new Date(),
+        pendingName: purpose === 'signup' && isEligibleRequest ? (name || '') : '',
         pendingPasswordHash,
         pendingRole: publicRole,
       },
-      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+      {
+        upsert: true,
+        returnDocument: 'after',
+        setDefaultsOnInsert: true,
+      },
     );
 
-    logAuth('send-otp', 'OTP document upserted.', {
-      requestId,
-      email,
-      expiresAt: expiresAt.toISOString(),
-    });
+    if (isEligibleRequest) {
+      await sendOtpEmail({
+        email,
+        otp,
+        purpose,
+        name: purpose === 'signup' ? name : existingUser?.name,
+      });
+    }
 
-    logAuth('send-otp', 'Sending OTP to dynamic recipient.', {
-      requestId,
-      recipientEmail: email,
-      source: 'req.body.email',
-    });
-
-    await sendOtpEmail({
-      email,
-      otp,
-      purpose,
-      name: purpose === 'signup' ? name : existingUser?.name,
-    });
-
-    logAuth('send-otp', 'OTP email sent successfully.', {
-      requestId,
-      email,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'OTP sent successfully',
-      expiresIn: OTP_EXPIRY_MINUTES * 60,
-      otpPreview: process.env.NODE_ENV?.trim() === 'production' ? undefined : otp,
-    });
+    res.status(200).json(buildOtpResponse(getOtpDeliveryMessage()));
   } catch (err) {
-    logAuth('send-otp', 'OTP request failed.', {
-      error: err instanceof Error ? err.message : 'Unknown error',
-    });
     next(err);
   }
 };
@@ -240,43 +241,49 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
 
-    const { purpose, otp } = req.body as { purpose: 'signup' | 'login'; otp: string };
+    const { purpose, otp } = req.body as { purpose: OtpPurpose; otp: string };
     const email = normalizeEmail(rawEmail);
+    const otpRecord: any = await AuthOtp.findOne({ email, purpose }).select('+otpHash +pendingPasswordHash');
 
-    const otpRecord: any = await AuthOtp.findOne({ email, purpose }).select('+pendingPasswordHash');
-
-    if (!otpRecord || otpRecord.expiresAt.getTime() < Date.now()) {
+    if (!otpRecord || otpRecord.expiresAt.getTime() <= Date.now()) {
       if (otpRecord) {
         await otpRecord.deleteOne();
       }
 
-      return res.status(400).json({ success: false, error: 'OTP is invalid or has expired' });
+      return res.status(400).json({ success: false, error: GENERIC_OTP_INVALID_MESSAGE });
     }
 
-    if (otpRecord.attempts >= otpRecord.maxAttempts) {
+    if (otpRecord.attempts >= OTP_MAX_ATTEMPTS) {
       await otpRecord.deleteOne();
-      return res.status(429).json({ success: false, error: 'Too many invalid attempts. Request a new OTP.' });
+      return res.status(429).json({ success: false, error: GENERIC_OTP_LOCKED_MESSAGE });
     }
 
-    const isValid = otpRecord.otpHash === hashOtp(email, purpose, otp);
+    const isValid = await bcrypt.compare(otp, otpRecord.otpHash);
 
     if (!isValid) {
       otpRecord.attempts += 1;
       await otpRecord.save();
-      return res.status(400).json({ success: false, error: 'OTP is invalid or has expired' });
+
+      if (otpRecord.attempts >= OTP_MAX_ATTEMPTS) {
+        await otpRecord.deleteOne();
+        return res.status(429).json({ success: false, error: GENERIC_OTP_LOCKED_MESSAGE });
+      }
+
+      return res.status(400).json({ success: false, error: GENERIC_OTP_INVALID_MESSAGE });
     }
 
     let user: any;
 
     if (purpose === 'signup') {
       const existingUser = await User.findOne({ email });
-      if (existingUser) {
+
+      if (existingUser || !otpRecord.pendingPasswordHash) {
         await otpRecord.deleteOne();
-        return res.status(400).json({ success: false, error: 'An account with this email already exists' });
+        return res.status(400).json({ success: false, error: GENERIC_OTP_INVALID_MESSAGE });
       }
 
       user = await User.create({
-        name: otpRecord.pendingName,
+        name: otpRecord.pendingName || email.split('@')[0],
         email,
         password: otpRecord.pendingPasswordHash,
         role: otpRecord.pendingRole,
@@ -284,10 +291,13 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
         authProvider: 'local',
       });
     } else {
-      user = await User.findOne({ email });
+      user = otpRecord.userId
+        ? await User.findById(otpRecord.userId)
+        : await User.findOne({ email });
+
       if (!user) {
         await otpRecord.deleteOne();
-        return res.status(404).json({ success: false, error: 'No account found for this email' });
+        return res.status(400).json({ success: false, error: GENERIC_OTP_INVALID_MESSAGE });
       }
     }
 

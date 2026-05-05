@@ -8,9 +8,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -20,11 +17,11 @@ export default defineConfig(({ mode }) => {
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
         '/api': {
-          target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+          target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
           changeOrigin: true,
         },
         '/uploads': {
-          target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+          target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
           changeOrigin: true,
         },
       },

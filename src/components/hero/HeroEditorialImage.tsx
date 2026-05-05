@@ -1,7 +1,9 @@
 import React from 'react';
+import { STATIC_EVENT_IMAGES } from '../../constants/images';
+import { FALLBACK_IMAGE_URL } from '../../utils';
 
-const HERO_IMAGE = '/images/decor.jpg';
-const HERO_THUMBNAIL = '/images/photography.jpg';
+const HERO_IMAGE = STATIC_EVENT_IMAGES.hero;
+const HERO_THUMBNAIL = STATIC_EVENT_IMAGES.heroThumbnail;
 
 export const HeroEditorialImage: React.FC = React.memo(() => {
   return (
@@ -13,6 +15,9 @@ export const HeroEditorialImage: React.FC = React.memo(() => {
             alt="Curated premium event styling"
             className="aspect-[4/5] w-full object-cover"
             decoding="async"
+            onError={(event) => {
+              (event.target as HTMLImageElement).src = FALLBACK_IMAGE_URL;
+            }}
           />
         </div>
       </div>
@@ -28,6 +33,9 @@ export const HeroEditorialImage: React.FC = React.memo(() => {
             className="h-14 w-14 shrink-0 rounded-[16px] border border-black/5 object-cover"
             loading="lazy"
             decoding="async"
+            onError={(event) => {
+              (event.target as HTMLImageElement).src = FALLBACK_IMAGE_URL;
+            }}
           />
           <div className="min-w-0">
             <span className="inline-flex rounded-full bg-[#32251b] px-2.5 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.26em] text-[#f6ede2]">

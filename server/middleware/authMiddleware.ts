@@ -8,8 +8,7 @@ interface AuthRequest extends Request {
   user?: any;
 }
 
-// Protect routes
-export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
+const resolveTokenFromRequest = (req: AuthRequest) => {
   let token = '';
 
   if (
@@ -24,15 +23,25 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
     token = readCookie(req.headers.cookie, getJwtCookieName());
   }
 
+  return token;
+};
+
+const resolveUserFromToken = async (token: string) => {
+  const decoded: any = jwt.verify(token, getJwtSecret());
+  return User.findById(decoded.id);
+};
+
+// Protect routes
+export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const token = resolveTokenFromRequest(req);
+
   // Make sure token exists
   if (!token) {
     return res.status(401).json({ success: false, error: 'Not authorized to access this route' });
   }
 
   try {
-    const decoded: any = jwt.verify(token, getJwtSecret());
-
-    req.user = await User.findById(decoded.id);
+    req.user = await resolveUserFromToken(token);
 
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'User no longer exists' });
@@ -42,6 +51,23 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
   } catch (err) {
     return res.status(401).json({ success: false, error: 'Not authorized to access this route' });
   }
+};
+
+export const protectOptional = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const token = resolveTokenFromRequest(req);
+
+  if (!token) {
+    next();
+    return;
+  }
+
+  try {
+    req.user = await resolveUserFromToken(token);
+  } catch (error) {
+    req.user = undefined;
+  }
+
+  next();
 };
 
 // Grant access to specific roles

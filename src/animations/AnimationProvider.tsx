@@ -1,11 +1,19 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
+import {
+  shouldEnableCinematicEffects,
+  shouldEnablePointerEffects,
+  shouldReduceMotion,
+  shouldUseSmoothScroll,
+} from '../utils/performance';
 
 const AnimationContext = createContext<{
-  lenis: any | null;
   isReducedMotion: boolean;
+  allowCinematicEffects: boolean;
+  allowPointerEffects: boolean;
+  useSmoothScroll: boolean;
 } | null>(null);
 
 export const useAnimation = () => {
@@ -15,8 +23,10 @@ export const useAnimation = () => {
 };
 
 export const AnimationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [lenis, setLenis] = useState<any | null>(null);
   const [isReducedMotion, setIsReducedMotion] = useState(false);
+  const [allowCinematicEffects, setAllowCinematicEffects] = useState(false);
+  const [allowPointerEffects, setAllowPointerEffects] = useState(false);
+  const [useSmoothScroll, setUseSmoothScroll] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -26,15 +36,26 @@ export const AnimationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     gsap.registerPlugin(ScrollTrigger);
 
     const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const desktopMedia = window.matchMedia('(min-width: 1024px)');
+    const cinematicMedia = window.matchMedia('(min-width: 1280px)');
     const handleChange = () => {
-      setIsReducedMotion(reducedMotionMedia.matches);
+      setIsReducedMotion(shouldReduceMotion());
+      setAllowCinematicEffects(shouldEnableCinematicEffects());
+      setAllowPointerEffects(shouldEnablePointerEffects());
+      setUseSmoothScroll(shouldUseSmoothScroll());
     };
 
     handleChange();
     reducedMotionMedia.addEventListener('change', handleChange);
+    desktopMedia.addEventListener('change', handleChange);
+    cinematicMedia.addEventListener('change', handleChange);
+    window.addEventListener('resize', handleChange, { passive: true });
 
     return () => {
       reducedMotionMedia.removeEventListener('change', handleChange);
+      desktopMedia.removeEventListener('change', handleChange);
+      cinematicMedia.removeEventListener('change', handleChange);
+      window.removeEventListener('resize', handleChange);
     };
   }, []);
 
@@ -43,22 +64,21 @@ export const AnimationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return undefined;
     }
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!useSmoothScroll) {
       return undefined;
     }
 
     const nextLenis = new Lenis({
-      duration: 1.18,
-      lerp: 0.085,
+      duration: 0.82,
+      lerp: 0.12,
       smoothWheel: true,
       gestureOrientation: 'vertical',
-      wheelMultiplier: 0.9,
+      wheelMultiplier: 0.82,
       touchMultiplier: 1,
       syncTouch: false,
     });
 
     nextLenis.on('scroll', ScrollTrigger.update);
-    setLenis(nextLenis);
 
     const ticker = (time: number) => {
       nextLenis.raf(time * 1000);
@@ -71,12 +91,18 @@ export const AnimationProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => {
       gsap.ticker.remove(ticker);
       nextLenis.destroy();
-      setLenis(null);
     };
-  }, []);
+  }, [useSmoothScroll]);
+
+  const value = useMemo(() => ({
+    isReducedMotion,
+    allowCinematicEffects,
+    allowPointerEffects,
+    useSmoothScroll,
+  }), [allowCinematicEffects, allowPointerEffects, isReducedMotion, useSmoothScroll]);
 
   return (
-    <AnimationContext.Provider value={{ lenis, isReducedMotion }}>
+    <AnimationContext.Provider value={value}>
       {children}
     </AnimationContext.Provider>
   );

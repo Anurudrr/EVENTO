@@ -2,7 +2,7 @@
 
 EVENTO is a full-stack event marketplace where attendees can discover and book event services, while organizers can create listings, manage bookings, and grow their presence on the platform.
 
-The project combines a React + Vite frontend with an Express + MongoDB backend and supports real authentication, wishlist management, reviews, bookings, contact submissions, and vendor dashboards.
+The project combines a React + Vite frontend with an Express + MongoDB backend and supports JWT authentication, OTP-based signup/login, wishlist management, reviews, bookings, contact submissions, and vendor dashboards.
 
 ## Features
 
@@ -29,6 +29,7 @@ The project combines a React + Vite frontend with an Express + MongoDB backend a
 ### Platform features
 - Protected routes
 - JWT authentication
+- OTP signup/login with secure email delivery and TTL expiry
 - MongoDB persistence
 - Contact form submission
 - Review and rating support
@@ -96,6 +97,7 @@ npm install
 ### 2. Create your environment file
 
 Create a `.env` file in the project root and copy values from `.env.example`.
+Do not commit `.env`, `.vercel.env`, or exported secret files.
 
 Example:
 
@@ -105,6 +107,8 @@ NODE_ENV=development
 MONGO_URI=mongodb://localhost:27017/evento
 JWT_SECRET=replace_with_a_long_random_secret
 JWT_EXPIRE=30d
+OTP_DELIVERY_MODE=auto
+ALLOW_DIRECT_REGISTER=false
 CORS_ORIGIN=http://localhost:3000
 RATE_LIMIT_WINDOW=15
 RATE_LIMIT_MAX=100
@@ -120,9 +124,20 @@ The app runs on:
 
 - Frontend + backend server: `http://localhost:3000`
 
-Image uploads require valid Cloudinary credentials in `.env`. The rest of the app can run without them, but event/profile image uploads will fail until they are configured.
+If SMTP is not configured outside production, OTP delivery falls back to a secure local outbox at `.dev-mail/otp-outbox/`. OTP values are never returned in API responses or logged to the console.
 
-### 4. Validate before deployment
+Image uploads prefer Cloudinary when it is configured. If Cloudinary is unavailable, the app falls back to local storage under `uploads/`.
+
+### 4. Run the production build locally
+
+```bash
+npm run build
+npm run start
+```
+
+By default the production server also runs on `http://localhost:3000`.
+
+### 5. Validate before deployment
 
 ```bash
 npm run lint
@@ -134,7 +149,11 @@ npm run build
 ### Auth
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/send-otp`
+- `POST /api/auth/verify-otp`
+- `POST /api/auth/logout`
 - `GET /api/auth/me`
+- `POST /api/auth/register` is disabled by default unless `ALLOW_DIRECT_REGISTER=true`
 
 ### Events
 - `GET /api/events`
@@ -142,6 +161,14 @@ npm run build
 - `POST /api/events`
 - `PUT /api/events/:id`
 - `DELETE /api/events/:id`
+
+### Services
+- `GET /api/services`
+- `GET /api/services/map`
+- `GET /api/services/:id`
+- `POST /api/services`
+- `PUT /api/services/:id`
+- `DELETE /api/services/:id`
 
 ### Bookings
 - `POST /api/bookings`
@@ -207,8 +234,11 @@ Suggested screenshots:
 ## Testing Checklist
 
 ### Attendee flow
-- Register as attendee
-- Login successfully
+- Register as attendee with OTP
+- Login successfully with password
+- Login successfully with OTP
+- Refresh while logged in and confirm the session persists
+- Logout and confirm protected pages redirect back to login
 - Browse events
 - Search and filter
 - Save to wishlist
@@ -220,7 +250,7 @@ Suggested screenshots:
 - Submit a review
 
 ### Organizer flow
-- Register as organizer
+- Register as organizer with OTP
 - Login successfully
 - Open seller dashboard
 - Create a new event
@@ -248,6 +278,8 @@ Suggested screenshots:
 ## Production Notes
 
 - Use a strong `JWT_SECRET`
+- Set `OTP_DELIVERY_MODE=email` and configure SMTP before using live OTP delivery
+- Keep `ALLOW_DIRECT_REGISTER=false` unless you explicitly need the legacy direct-register endpoint
 - Restrict `CORS_ORIGIN` to your real frontend domain
 - Persist or externalize uploads in production
 - Use MongoDB Atlas backups and monitoring

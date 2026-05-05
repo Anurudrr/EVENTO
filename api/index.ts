@@ -1,4 +1,5 @@
-import { createApp, ensureDatabaseConnection } from '../server/app.ts';
+import { createApp, ensureDatabaseConnection, getDatabaseStatus } from '../server/app.ts';
+import { getNodeEnv } from '../server/utils/env.ts';
 
 let appInstance: ReturnType<typeof createApp> | null = null;
 
@@ -7,11 +8,24 @@ export default async function handler(req: any, res: any) {
   const isHealthCheck = requestPath === '/api/health' || requestPath === '/health';
 
   if (isHealthCheck) {
-    return res.status(200).json({
-      success: true,
-      status: 'ok',
+    try {
+      await ensureDatabaseConnection();
+    } catch {
+      // Health responses should reflect the latest database status instead of masking failures.
+    }
+
+    const databaseStatus = getDatabaseStatus();
+    const isHealthy = databaseStatus.connected;
+
+    return res.status(isHealthy ? 200 : 503).json({
+      success: isHealthy,
+      status: isHealthy ? 'ok' : 'degraded',
       uptime: process.uptime(),
-      env: process.env.NODE_ENV?.trim() || 'unknown',
+      env: getNodeEnv(),
+      database: isHealthy ? 'connected' : 'unavailable',
+      ...(!isHealthy && getNodeEnv() === 'development' && databaseStatus.error
+        ? { databaseMessage: databaseStatus.error.message }
+        : {}),
     });
   }
 

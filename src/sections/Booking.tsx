@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Phone, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Phone, CheckCircle2, ArrowRight, MapPin, Sparkles } from 'lucide-react';
+import { LocationPicker } from '../components/LocationPicker';
+import { ServiceLocation } from '../types';
+import { formatCoordinates } from '../utils';
 
 export const Booking: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [selectedServiceLocation, setSelectedServiceLocation] = useState<ServiceLocation | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!selectedServiceLocation) {
+      return;
+    }
+
     setIsSubmitted(true);
     setTimeout(() => setIsSubmitted(false), 5000);
   };
@@ -114,11 +123,34 @@ export const Booking: React.FC = () => {
                     />
                   </div>
 
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <label className="text-[10px] font-mono font-semibold text-noir-muted uppercase tracking-widest ml-1">Service Location</label>
+                        <p className="mt-2 text-xs uppercase tracking-wide text-noir-muted">
+                          Pin the requested venue so the team knows exactly where the event support is needed.
+                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-2 border border-noir-border bg-noir-bg px-4 py-3 text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-ink">
+                        <MapPin className="h-4 w-4 text-noir-accent" />
+                        {selectedServiceLocation ? formatCoordinates(selectedServiceLocation) : 'Location required'}
+                      </div>
+                    </div>
+
+                    <LocationPicker
+                      selectedLocation={selectedServiceLocation}
+                      onLocationSelect={(location) => setSelectedServiceLocation({ lat: location.lat, lng: location.lng })}
+                      height={320}
+                      title="Requested venue"
+                    />
+                  </div>
+
                   <button 
                     type="submit"
+                    disabled={!selectedServiceLocation}
                     className="w-full btn-noir !py-6 font-serif text-lg uppercase tracking-widest flex items-center justify-center gap-4 group"
                   >
-                    Send Inquiry
+                    {selectedServiceLocation ? 'Send Inquiry' : 'Select Service Location'}
                     <ArrowRight className="w-6 h-6 group-hover:translate-x-3 transition-transform" />
                   </button>
                 </motion.form>

@@ -29,6 +29,16 @@ const getRawImageList = (service: any) => {
   return service.images.filter((image: unknown): image is string => typeof image === 'string' && image.trim().length > 0);
 };
 
+const normalizeCoordinate = (value: unknown, min: number, max: number) => {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    return undefined;
+  }
+
+  return parsed;
+};
+
 export const normalizeUser = (user: any): User | undefined => {
   if (!user || typeof user !== 'object') return undefined;
 
@@ -40,6 +50,14 @@ export const normalizeUser = (user: any): User | undefined => {
     profilePicture: getProfileImageUrl(user),
     bio: getSafeText(user.bio, DEFAULT_USER_BIO),
     upiId: getSafeText(user.upiId, ''),
+    businessName: getSafeText(user.businessName, ''),
+    businessType: getSafeText(user.businessType, ''),
+    businessLocation: getSafeText(user.businessLocation, ''),
+    responseTimeHours: Number.isFinite(Number(user.responseTimeHours)) ? Number(user.responseTimeHours) : undefined,
+    verificationStatus: user.verificationStatus || 'unverified',
+    verificationNotes: getSafeText(user.verificationNotes, ''),
+    verificationSubmittedAt: user.verificationSubmittedAt,
+    verifiedAt: user.verifiedAt,
     createdAt: user.createdAt,
   };
 };
@@ -51,6 +69,17 @@ export const normalizeAvailability = (entry: any): AvailabilityEntry => ({
   note: entry?.note || '',
 });
 
+const normalizeServiceLocation = (serviceLocation: any) => {
+  const lat = normalizeCoordinate(serviceLocation?.lat, -90, 90);
+  const lng = normalizeCoordinate(serviceLocation?.lng, -180, 180);
+
+  if (lat === undefined || lng === undefined) {
+    return undefined;
+  }
+
+  return { lat, lng };
+};
+
 export const normalizeService = (service: any): Service => ({
   _id: service._id,
   title: getSafeText(service?.title, DEFAULT_SERVICE_TITLE),
@@ -59,9 +88,14 @@ export const normalizeService = (service: any): Service => ({
   priceLabel: getSafeText(service?.priceLabel, ''),
   category: getSafeText(service?.category, 'General'),
   location: getSafeText(service?.location, DEFAULT_SERVICE_LOCATION),
+  lat: normalizeCoordinate(service?.lat, -90, 90),
+  lng: normalizeCoordinate(service?.lng, -180, 180),
   images: getServiceImageUrls(service),
   rawImages: getRawImageList(service),
   upiId: getSafeText(service?.upiId, ''),
+  cancellationPolicy: getSafeText(service?.cancellationPolicy, ''),
+  refundPolicy: getSafeText(service?.refundPolicy, ''),
+  serviceTerms: getSafeText(service?.serviceTerms, ''),
   organizer: typeof service.organizer === 'object' ? normalizeUser(service.organizer)! : service.organizer,
   rating: Number(service.rating ?? 0),
   reviews: Number(service.reviews ?? 0),
@@ -82,6 +116,7 @@ export const normalizeBooking = (booking: any): Booking => ({
   phone: booking.phone || '',
   eventType: booking.eventType || 'General Event',
   eventLocation: booking.eventLocation || '',
+  serviceLocation: normalizeServiceLocation(booking.serviceLocation),
   time: booking.time || '',
   guests: Number(booking.guests ?? 1),
   notes: booking.notes || '',
@@ -170,6 +205,8 @@ export const normalizeAdminOverview = (payload: any): AdminOverview => ({
   summary: {
     users: Number(payload?.summary?.users ?? 0),
     organizers: Number(payload?.summary?.organizers ?? 0),
+    verifiedOrganizers: Number(payload?.summary?.verifiedOrganizers ?? 0),
+    pendingOrganizerReviews: Number(payload?.summary?.pendingOrganizerReviews ?? 0),
     services: Number(payload?.summary?.services ?? 0),
     bookings: Number(payload?.summary?.bookings ?? 0),
     payments: Number(payload?.summary?.payments ?? 0),

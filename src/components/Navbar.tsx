@@ -5,6 +5,7 @@ import { Globe, Menu, X, Sparkles, LogOut, LayoutDashboard, ChevronDown, UserCir
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from './ui/Avatar';
 import { NotificationBell } from './NotificationBell';
+import { getDashboardPathForRole } from '../utils/dashboard';
 
 const navLinks = [
   { name: 'Home', href: '/' },
@@ -33,11 +34,7 @@ export const Navbar: React.FC = React.memo(() => {
     setIsProfileOpen(false);
   }, [location]);
 
-  const dashboardPath = user?.role === 'admin'
-    ? '/dashboard/admin'
-    : user?.role === 'organizer'
-      ? '/dashboard/seller'
-      : '/dashboard/buyer';
+  const dashboardPath = getDashboardPathForRole(user?.role);
 
   return (
     <motion.nav

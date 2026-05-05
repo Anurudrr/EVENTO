@@ -1,4 +1,5 @@
 import Notification from '../models/Notification.ts';
+import { pushNotificationStreamEvent } from './notificationStream.ts';
 
 interface NotificationInput {
   user: string;
@@ -17,7 +18,7 @@ export const createNotification = async ({
   link = '',
   metadata = {},
 }: NotificationInput) => {
-  return Notification.create({
+  const notification = await Notification.create({
     user,
     type,
     title,
@@ -25,4 +26,8 @@ export const createNotification = async ({
     link,
     metadata,
   });
+
+  pushNotificationStreamEvent(user, notification.toObject ? notification.toObject() : notification);
+
+  return notification;
 };

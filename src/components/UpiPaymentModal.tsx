@@ -6,6 +6,7 @@ import {
   Check,
   CheckCheck,
   Copy,
+  CreditCard,
   Loader2,
   QrCode,
   RefreshCw,
@@ -15,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { RAZORPAY_KEY_ID } from '../config/env';
 import { bookingService } from '../services/bookingService';
 import { useToast } from '../context/ToastContext';
 import { Booking, PaymentSession, Service } from '../types';
@@ -25,6 +27,8 @@ import {
   getErrorMessage,
   getServiceTitle,
 } from '../utils';
+import { copyTextWithPermissionMemory } from '../utils/permissions';
+import { loadRazorpayCheckout } from '../utils/razorpay';
 
 interface UpiPaymentModalProps {
   open: boolean;
@@ -50,21 +54,29 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const autoCheckoutStarted = useRef(false);
   const terminalStatusRef = useRef('');
   const [session, setSession] = useState<PaymentSession | null>(null);
   const [utr, setUtr] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [loadingSession, setLoadingSession] = useState(false);
+  const [launchingCheckout, setLaunchingCheckout] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [statusError, setStatusError] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [successState, setSuccessState] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
 
   const serviceTitle = useMemo(
     () => session?.serviceTitle || getServiceTitle(service),
     [service, session?.serviceTitle],
   );
+
+  const isRazorpayConfigurationError = (message: string) => {
+    const normalized = message.toLowerCase();
+    return normalized.includes('razorpay is not configured') || normalized.includes('checkout.js');
+  };
 
   const loadPaymentSession = async () => {
     if (!booking) {
@@ -99,23 +111,151 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
 
   useEffect(() => {
     if (!open) {
+      autoCheckoutStarted.current = false;
       terminalStatusRef.current = '';
       setSession(null);
       setUtr('');
       setQrCodeDataUrl('');
       setLoadingSession(false);
+      setLaunchingCheckout(false);
       setSubmitting(false);
       setStatusMessage('');
       setStatusError('');
       setSecondsLeft(0);
       setSuccessState(false);
+      setManualMode(false);
       return;
     }
 
-    if (booking) {
+    if (booking && manualMode) {
       void loadPaymentSession();
     }
-  }, [open, booking?._id]);
+  }, [open, booking?._id, manualMode]);
+
+  const handlePaymentFailure = async (payload: {
+    code?: string;
+    description?: string;
+    source?: string;
+    step?: string;
+    reason?: string;
+  }) => {
+    if (!booking) {
+      return;
+    }
+
+    try {
+      const updatedBooking = await bookingService.recordPaymentFailure(booking._id, payload);
+      onPaid(updatedBooking);
+    } catch (error) {
+      console.error('[checkout:failure]', error);
+    }
+  };
+
+  const handleRazorpayCheckout = async () => {
+    if (!booking || !service || launchingCheckout || successState) {
+      return;
+    }
+
+    setLaunchingCheckout(true);
+    setStatusError('');
+    setStatusMessage('Preparing secure checkout...');
+
+    try {
+      const [order, isLoaded] = await Promise.all([
+        bookingService.createRazorpayOrder(booking._id),
+        loadRazorpayCheckout(),
+      ]);
+
+      const razorpayKey = order.keyId || RAZORPAY_KEY_ID;
+      if (!razorpayKey || !isLoaded || !window.Razorpay) {
+        throw new Error('Razorpay checkout.js could not be loaded.');
+      }
+
+      const razorpay = new window.Razorpay({
+        key: razorpayKey,
+        amount: order.amount,
+        currency: order.currency,
+        name: order.company,
+        description: order.description,
+        order_id: order.orderId,
+        prefill: order.prefill,
+        notes: {
+          bookingReference: order.bookingReference,
+          serviceTitle,
+        },
+        theme: {
+          color: '#c6a35b',
+        },
+        modal: {
+          ondismiss: () => {
+            setStatusMessage('Gateway checkout closed. Retry the card flow or use the QR fallback below.');
+          },
+        },
+        handler: async (response) => {
+          setStatusMessage('Verifying payment...');
+
+          try {
+            const updatedBooking = await bookingService.verifyRazorpayPayment(booking._id, response);
+            setStatusError('');
+            setSuccessState(true);
+            setStatusMessage('Payment confirmed. Closing checkout.');
+            onPaid(updatedBooking);
+            showToast('Payment confirmed', 'success');
+
+            window.setTimeout(() => {
+              onClose();
+            }, 1200);
+          } catch (error) {
+            const message = getErrorMessage(error, 'Payment verification failed.');
+            setStatusMessage('');
+            setStatusError(message);
+            showToast(message, 'error');
+          }
+        },
+      });
+
+      razorpay.on('payment.failed', async (event: any) => {
+        const errorPayload = {
+          code: event?.error?.code,
+          description: event?.error?.description,
+          source: 'razorpay',
+          step: event?.error?.step,
+          reason: event?.error?.reason,
+        };
+
+        await handlePaymentFailure(errorPayload);
+        setManualMode(true);
+        setStatusMessage('');
+        setStatusError(event?.error?.description || 'Payment failed. You can retry the gateway or use the QR fallback.');
+        showToast(event?.error?.description || 'Payment failed', 'error');
+      });
+
+      razorpay.open();
+      setStatusMessage('Complete the payment in the Razorpay checkout window.');
+    } catch (error) {
+      const message = getErrorMessage(error, 'Unable to launch checkout right now.');
+
+      if (isRazorpayConfigurationError(message)) {
+        setManualMode(true);
+        setStatusError('');
+        setStatusMessage('Gateway checkout is not configured here yet. Use the UPI QR fallback below.');
+      } else {
+        setStatusMessage('');
+        setStatusError(message);
+      }
+    } finally {
+      setLaunchingCheckout(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open || !booking || !service || autoCheckoutStarted.current || booking.paymentStatus === 'verified') {
+      return;
+    }
+
+    autoCheckoutStarted.current = true;
+    void handleRazorpayCheckout();
+  }, [open, booking?._id, service?._id, booking?.paymentStatus]);
 
   useEffect(() => {
     if (!session?.upiLink) {
@@ -235,10 +375,10 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
     }
 
     try {
-      await navigator.clipboard.writeText(value);
+      await copyTextWithPermissionMemory(value);
       showToast(`${label} copied`, 'success');
-    } catch {
-      showToast(`Unable to copy ${label.toLowerCase()}`, 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : `Unable to copy ${label.toLowerCase()}`, 'error');
     }
   };
 
@@ -315,12 +455,12 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
 
             <div className="relative grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
               <div className="border-b border-noir-border/70 bg-[#fbf7f1]/72 p-6 md:p-8 lg:border-b-0 lg:border-r">
-                <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">UPI QR checkout</p>
+                <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">Secure checkout</p>
                 <h3 className="mt-4 text-3xl font-display font-semibold uppercase tracking-wide text-noir-ink md:text-4xl">
-                  Finish the payment in your UPI app
+                  Confirm the booking with the fastest payment path
                 </h3>
                 <p className="mt-3 max-w-xl text-xs uppercase tracking-wide text-noir-muted md:text-sm">
-                  Scan the QR code, pay the organizer directly, then submit the UTR so EVENTO can confirm the booking.
+                  EVENTO attempts automated gateway checkout first. If that is unavailable, you can switch to the UPI QR fallback and submit the UTR for review.
                 </p>
 
                 <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -378,41 +518,79 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
                   </div>
                 )}
 
-                <div className="mt-8 border border-noir-border bg-noir-card p-5">
-                  <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Transaction ID / UTR</p>
-                  <p className="mt-2 text-xs uppercase tracking-wide text-noir-muted">
-                    After completing the transfer, paste the transaction reference from your UPI app.
-                  </p>
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                    <input
-                      value={utr}
-                      onChange={(event) => setUtr(event.target.value)}
-                      placeholder="Enter UTR or transaction ID"
-                      className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-sm uppercase tracking-wide text-noir-ink focus:border-noir-accent focus:outline-none"
-                      disabled={submitting || successState}
-                    />
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={handleSubmitPayment}
-                      disabled={submitting || loadingSession || successState || !session}
-                      className="btn-noir min-w-[13rem] !rounded-none !px-6 !py-4"
-                    >
-                      {submitting ? (
-                        <span className="inline-flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Submitting
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2">
-                          <CheckCheck className="h-4 w-4" />
-                          Submit Payment
-                        </span>
-                      )}
-                    </motion.button>
-                  </div>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => void handleRazorpayCheckout()}
+                    disabled={launchingCheckout || successState}
+                    className="btn-noir min-w-[13rem] !rounded-none !px-6 !py-4"
+                  >
+                    {launchingCheckout ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Launching
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        Pay with Razorpay
+                      </span>
+                    )}
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setManualMode((current) => !current)}
+                    disabled={successState}
+                    className="btn-outline-noir min-w-[13rem] !rounded-none !px-6 !py-4"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <QrCode className="h-4 w-4" />
+                      {manualMode ? 'Hide QR fallback' : 'Use UPI QR fallback'}
+                    </span>
+                  </motion.button>
                 </div>
+
+                {manualMode && (
+                  <div className="mt-8 border border-noir-border bg-noir-card p-5">
+                    <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Transaction ID / UTR</p>
+                    <p className="mt-2 text-xs uppercase tracking-wide text-noir-muted">
+                      After completing the UPI transfer, paste the transaction reference from your app.
+                    </p>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                      <input
+                        value={utr}
+                        onChange={(event) => setUtr(event.target.value)}
+                        placeholder="Enter UTR or transaction ID"
+                        className="w-full border border-noir-border bg-noir-bg px-5 py-4 text-sm uppercase tracking-wide text-noir-ink focus:border-noir-accent focus:outline-none"
+                        disabled={submitting || successState}
+                      />
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={handleSubmitPayment}
+                        disabled={submitting || loadingSession || successState || !session}
+                        className="btn-noir min-w-[13rem] !rounded-none !px-6 !py-4"
+                      >
+                        {submitting ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Submitting
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <CheckCheck className="h-4 w-4" />
+                            Submit Payment
+                          </span>
+                        )}
+                      </motion.button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="relative bg-white/48 p-6 md:p-8 backdrop-blur-xl">
@@ -420,20 +598,32 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
                 <div className="relative">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">Payment session</p>
-                      <h4 className="mt-3 text-2xl font-display font-semibold uppercase tracking-wide text-noir-ink">Scan and pay</h4>
+                      <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">Fallback payment session</p>
+                      <h4 className="mt-3 text-2xl font-display font-semibold uppercase tracking-wide text-noir-ink">
+                        {manualMode ? 'Scan and pay' : 'Gateway first'}
+                      </h4>
                     </div>
                     <div className="border border-noir-border bg-noir-bg px-4 py-3 text-right">
                       <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-muted">Timer</p>
                       <p className="mt-2 font-mono text-lg font-semibold tracking-[0.2em] text-noir-ink">
-                        {session?.submittedAt ? 'LIVE' : formatTimer(secondsLeft)}
+                        {manualMode ? (session?.submittedAt ? 'LIVE' : formatTimer(secondsLeft)) : 'CARD'}
                       </p>
                     </div>
                   </div>
 
                   <div className="mt-6 overflow-hidden border border-noir-border bg-noir-bg p-5">
                     <div className="relative flex min-h-[22rem] items-center justify-center border border-noir-border bg-white p-4">
-                      {loadingSession ? (
+                      {!manualMode ? (
+                        <div className="flex max-w-sm flex-col items-center gap-4 text-center text-noir-muted">
+                          <CreditCard className="h-10 w-10 text-noir-accent" />
+                          <div>
+                            <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.3em] text-noir-accent">Automated checkout</p>
+                            <p className="mt-3 text-xs uppercase tracking-wide">
+                              Use Razorpay for instant payment confirmation. Open the QR fallback only if you need a manual UPI route.
+                            </p>
+                          </div>
+                        </div>
+                      ) : loadingSession ? (
                         <div className="flex flex-col items-center gap-3 text-noir-muted">
                           <Loader2 className="h-8 w-8 animate-spin" />
                           <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.3em]">Preparing QR</span>
@@ -474,7 +664,8 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
                       )}
                     </div>
 
-                    <div className="mt-5 space-y-3">
+                    {manualMode && (
+                      <div className="mt-5 space-y-3">
                       <div className="flex items-center justify-between gap-3 border border-noir-border bg-white px-4 py-4">
                         <div className="min-w-0">
                           <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">UPI ID</p>
@@ -494,47 +685,56 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
                           <Copy className="h-4 w-4" />
                         </button>
                       </div>
-                    </div>
+                      </div>
+                    )}
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      <a
-                        href={session?.upiLink || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`btn-noir !rounded-none !py-4 ${session?.upiLink ? '' : 'pointer-events-none opacity-50'}`}
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <Smartphone className="h-4 w-4" />
-                          Open UPI App
-                        </span>
-                      </a>
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => void loadPaymentSession()}
-                        disabled={loadingSession || submitting}
-                        className="btn-outline-noir !rounded-none !py-4"
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <RefreshCw className={`h-4 w-4 ${loadingSession ? 'animate-spin' : ''}`} />
-                          Generate Fresh QR
-                        </span>
-                      </motion.button>
-                    </div>
+                    {manualMode && (
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                        <a
+                          href={session?.upiLink || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`btn-noir !rounded-none !py-4 ${session?.upiLink ? '' : 'pointer-events-none opacity-50'}`}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Smartphone className="h-4 w-4" />
+                            Open UPI App
+                          </span>
+                        </a>
+                        <motion.button
+                          type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => void loadPaymentSession()}
+                          disabled={loadingSession || submitting}
+                          className="btn-outline-noir !rounded-none !py-4"
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <RefreshCw className={`h-4 w-4 ${loadingSession ? 'animate-spin' : ''}`} />
+                            Generate Fresh QR
+                          </span>
+                        </motion.button>
+                      </div>
+                    )}
 
                     <div className="mt-5 space-y-3 text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-muted">
                       <div className="flex items-center gap-3 border border-noir-border bg-white px-4 py-4">
                         <Wallet className="h-4 w-4 text-noir-accent" />
-                        Pay {formatCurrency(session?.amount || booking.amount)} to the organizer UPI account.
+                        {manualMode
+                          ? `Pay ${formatCurrency(session?.amount || booking.amount)} to the organizer UPI account.`
+                          : 'Gateway checkout verifies payment instantly whenever Razorpay is available.'}
                       </div>
                       <div className="flex items-center gap-3 border border-noir-border bg-white px-4 py-4">
                         <ShieldCheck className="h-4 w-4 text-noir-accent" />
-                        Submit the UTR after payment so EVENTO can confirm your booking.
+                        {manualMode
+                          ? 'Submit the UTR after payment so EVENTO can confirm your booking.'
+                          : 'Switch to QR fallback only if you need manual UPI collection.'}
                       </div>
                       <div className="flex items-center gap-3 border border-noir-border bg-white px-4 py-4">
                         <CheckCheck className="h-4 w-4 text-noir-accent" />
-                        Status refreshes automatically every 5 seconds after submission.
+                        {manualMode
+                          ? 'Status refreshes automatically every 5 seconds after submission.'
+                          : 'Both payment routes update the booking status inside buyer and seller dashboards.'}
                       </div>
                     </div>
                   </div>

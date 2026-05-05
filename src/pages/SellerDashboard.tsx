@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, CreditCard, LayoutDashboard, MessageSquare } from 'lucide-react';
+import { Calendar, CreditCard, ExternalLink, LayoutDashboard, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { OrderLocationMap } from '../components/OrderLocationMap';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { bookingService } from '../services/bookingService';
 import { serviceService } from '../services/serviceService';
@@ -11,12 +12,15 @@ import { ChatPanel } from '../components/ChatPanel';
 import { Skeleton } from '../components/ui/Skeleton';
 import {
   FALLBACK_IMAGE_URL,
+  buildDirectionsLink,
   formatBookingStatus,
+  formatCoordinates,
   formatCurrency,
   formatDateTime,
   formatPriceLabel,
   formatServicePrice,
   getErrorMessage,
+  getImageUrl,
   getServiceTitle,
   getUserDisplayName,
 } from '../utils';
@@ -130,6 +134,11 @@ const SellerDashboard: React.FC = () => {
               const service = typeof booking.service === 'object' ? booking.service as Service : null;
               const buyer = typeof booking.user === 'object' ? booking.user : null;
               const serviceTitle = getServiceTitle(service);
+              const sellerServiceLocation = service?.lat != null && service?.lng != null
+                ? { lat: service.lat, lng: service.lng }
+                : null;
+              const buyerServiceLocation = booking.serviceLocation || null;
+              const navigateUrl = buildDirectionsLink(buyerServiceLocation);
 
               return (
                 <div key={booking._id} className="border border-noir-border bg-noir-bg p-6">
@@ -150,6 +159,15 @@ const SellerDashboard: React.FC = () => {
                       {booking.eventLocation && (
                         <p className="text-xs uppercase tracking-wide text-noir-muted">Venue: {booking.eventLocation}</p>
                       )}
+                      {buyerServiceLocation && (
+                        <p className="text-xs uppercase tracking-wide text-noir-muted">Buyer pin: {formatCoordinates(buyerServiceLocation)}</p>
+                      )}
+                      {!buyerServiceLocation && (
+                        <p className="text-xs uppercase tracking-wide text-amber-500">Buyer location pin unavailable</p>
+                      )}
+                      {!sellerServiceLocation && (
+                        <p className="text-xs uppercase tracking-wide text-amber-500">Seller location pin unavailable for this service</p>
+                      )}
                       {booking.notes && (
                         <p className="text-xs uppercase tracking-wide text-noir-muted">Notes: {booking.notes}</p>
                       )}
@@ -157,7 +175,7 @@ const SellerDashboard: React.FC = () => {
                         <p className="text-xs uppercase tracking-wide text-noir-muted">Transaction: {booking.transactionId}</p>
                       )}
                       {booking.paymentScreenshot && (
-                        <a href={booking.paymentScreenshot} target="_blank" rel="noreferrer" className="inline-block text-xs font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">
+                        <a href={getImageUrl(booking.paymentScreenshot)} target="_blank" rel="noreferrer" className="inline-block text-xs font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">
                           View payment proof
                         </a>
                       )}
@@ -192,9 +210,32 @@ const SellerDashboard: React.FC = () => {
                             Chat
                           </span>
                         </button>
+                        {navigateUrl && (
+                          <a
+                            href={navigateUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-outline-noir !rounded-none !px-5 !py-3"
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <ExternalLink className="h-4 w-4" />
+                              Navigate
+                            </span>
+                          </a>
+                        )}
                       </div>
                     </div>
                   </div>
+
+                  {(sellerServiceLocation || buyerServiceLocation) && (
+                    <div className="mt-6 border-t border-noir-border pt-6">
+                      <OrderLocationMap
+                        sellerLocation={sellerServiceLocation}
+                        buyerLocation={buyerServiceLocation}
+                        height={280}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             }) : (

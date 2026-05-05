@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import { isProductionEnv } from '../utils/env.ts';
 
 interface ErrorResponse extends Error {
   statusCode?: number;
@@ -29,14 +30,11 @@ const errorHandler = (err: ErrorResponse, req: Request, res: Response, next: Nex
   // Mongoose duplicate key
   if (err.code === 11000) {
     const duplicateFields = getDuplicateKeyFields(err);
-    const isLegacyBookingField = duplicateFields.some((field) => ['email', 'phone'].includes(field));
-    const message = isLegacyBookingField
-      ? 'Duplicate field error fixed'
-      : duplicateFields.length > 0
-        ? `Duplicate field value entered for: ${duplicateFields.join(', ')}`
-        : 'Duplicate field value entered';
+    const message = duplicateFields.length > 0
+      ? `Duplicate field value entered for: ${duplicateFields.join(', ')}`
+      : 'Duplicate field value entered';
     error = new Error(message) as ErrorResponse;
-    error.statusCode = 400;
+    error.statusCode = 409;
   }
 
   // Mongoose validation error
@@ -56,12 +54,12 @@ const errorHandler = (err: ErrorResponse, req: Request, res: Response, next: Nex
   }
 
   if (err.message === 'Images only!') {
-    error = new Error('Image upload failed: only JPG and PNG files are allowed.') as ErrorResponse;
+    error = new Error('Image upload failed: only JPG, PNG, and WebP files are allowed.') as ErrorResponse;
     error.statusCode = 400;
   }
 
   const statusCode = error.statusCode || 500;
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = isProductionEnv();
 
   res.status(statusCode).json({
     success: false,

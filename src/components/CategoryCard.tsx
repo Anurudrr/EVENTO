@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Calendar, Camera, Music, Plus, Sparkles, Utensils, Video } from 'lucide-react';
 import { Category } from '../types';
+import { FALLBACK_IMAGE_URL } from '../utils';
 
 interface CategoryCardProps {
   category: Category;
@@ -33,14 +34,14 @@ export const CategoryCard: React.FC<CategoryCardProps> = React.memo(({ category,
         style={{ animationDelay: `${index * 80}ms` }}
       >
         <img
-          src={category.image || '/images/placeholder.png'}
+          src={category.image || FALLBACK_IMAGE_URL}
           alt={category.name}
           className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
           loading="lazy"
           referrerPolicy="no-referrer"
           onError={(e) => {
             e.currentTarget.onerror = null;
-            e.currentTarget.src = '/images/placeholder.png';
+            e.currentTarget.src = FALLBACK_IMAGE_URL;
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-noir-bg via-noir-bg/40 to-transparent opacity-80 group-hover:from-noir-accent/95 group-hover:via-noir-accent/35 group-hover:to-transparent" />

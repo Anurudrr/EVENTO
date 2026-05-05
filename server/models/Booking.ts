@@ -94,6 +94,18 @@ const bookingSchema = new mongoose.Schema(
       trim: true,
       maxlength: [160, 'Event location cannot be more than 160 characters'],
     },
+    serviceLocation: {
+      lat: {
+        type: Number,
+        min: [-90, 'Service latitude must be at least -90'],
+        max: [90, 'Service latitude must be at most 90'],
+      },
+      lng: {
+        type: Number,
+        min: [-180, 'Service longitude must be at least -180'],
+        max: [180, 'Service longitude must be at most 180'],
+      },
+    },
     time: {
       type: String,
       required: [true, 'Please add a booking time'],
@@ -111,6 +123,85 @@ const bookingSchema = new mongoose.Schema(
       trim: true,
       maxlength: [1000, 'Notes cannot be more than 1000 characters'],
     },
+    pricingMode: {
+      type: String,
+      enum: ['standard', 'package', 'quote'],
+      default: 'standard',
+    },
+    selectedPackageId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    packageName: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [120, 'Package name cannot be more than 120 characters'],
+    },
+    packagePrice: {
+      type: Number,
+      default: 0,
+      min: [0, 'Package price cannot be negative'],
+    },
+    selectedAddOns: {
+      type: [
+        new mongoose.Schema(
+          {
+            addOnId: {
+              type: String,
+              default: '',
+              trim: true,
+            },
+            name: {
+              type: String,
+              required: true,
+              trim: true,
+              maxlength: [120, 'Add-on name cannot be more than 120 characters'],
+            },
+            price: {
+              type: Number,
+              required: true,
+              min: [0, 'Add-on price cannot be negative'],
+            },
+            quantity: {
+              type: Number,
+              default: 1,
+              min: [1, 'Add-on quantity must be at least 1'],
+            },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
+    customResponses: {
+      type: [
+        new mongoose.Schema(
+          {
+            questionId: {
+              type: String,
+              default: '',
+              trim: true,
+            },
+            label: {
+              type: String,
+              default: '',
+              trim: true,
+              maxlength: [120, 'Question label cannot be more than 120 characters'],
+            },
+            answer: {
+              type: String,
+              default: '',
+              trim: true,
+              maxlength: [500, 'Question answer cannot be more than 500 characters'],
+            },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'accepted', 'rejected', 'completed', 'cancelled'],
@@ -125,6 +216,31 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: [0, 'Amount cannot be negative'],
+    },
+    totalAmount: {
+      type: Number,
+      default(this: any) {
+        return Number(this.amount || 0);
+      },
+      min: [0, 'Total amount cannot be negative'],
+    },
+    advanceAmount: {
+      type: Number,
+      default(this: any) {
+        return Number(this.amount || 0);
+      },
+      min: [0, 'Advance amount cannot be negative'],
+    },
+    balanceAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Balance amount cannot be negative'],
+    },
+    commissionRate: {
+      type: Number,
+      default: 0.12,
+      min: [0, 'Commission rate cannot be negative'],
+      max: [1, 'Commission rate cannot exceed 1'],
     },
     currency: {
       type: String,
@@ -173,6 +289,17 @@ const bookingSchema = new mongoose.Schema(
     paidAt: {
       type: Date,
     },
+    refundStatus: {
+      type: String,
+      enum: ['none', 'requested', 'approved', 'rejected', 'processed'],
+      default: 'none',
+      index: true,
+    },
+    refundAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Refund amount cannot be negative'],
+    },
   },
   {
     timestamps: true,
@@ -183,6 +310,8 @@ bookingSchema.index({ user: 1, createdAt: -1 });
 bookingSchema.index({ organizer: 1, createdAt: -1 });
 bookingSchema.index({ service: 1, date: 1, time: 1 });
 bookingSchema.index({ status: 1, paymentStatus: 1, createdAt: -1 });
+bookingSchema.index({ refundStatus: 1, createdAt: -1 });
+bookingSchema.index({ 'serviceLocation.lat': 1, 'serviceLocation.lng': 1 });
 
 const Booking: mongoose.Model<any> = (mongoose.models.Booking as mongoose.Model<any>)
   || (mongoose.model<any>('Booking', bookingSchema) as mongoose.Model<any>);

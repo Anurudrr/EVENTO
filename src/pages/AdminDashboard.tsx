@@ -30,6 +30,7 @@ const AdminDashboard: React.FC = () => {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [processingPaymentId, setProcessingPaymentId] = useState('');
+  const [processingOrganizerId, setProcessingOrganizerId] = useState('');
 
   const loadOverview = async () => {
     setLoading(true);
@@ -108,9 +109,72 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const updateOrganizerState = (organizerId: string, verificationStatus: AdminOverview['users'][number]['verificationStatus'], verificationNotes = '') => {
+    setOverview((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const previousOrganizer = current.users.find((item) => item._id === organizerId);
+      const previousStatus = previousOrganizer?.verificationStatus;
+      const nextVerifiedCount = current.summary.verifiedOrganizers
+        + (previousStatus === 'verified' ? -1 : 0)
+        + (verificationStatus === 'verified' ? 1 : 0);
+      const nextPendingCount = current.summary.pendingOrganizerReviews
+        + (previousStatus === 'pending' ? -1 : 0)
+        + (verificationStatus === 'pending' ? 1 : 0);
+
+      return {
+        ...current,
+        summary: {
+          ...current.summary,
+          verifiedOrganizers: Math.max(0, nextVerifiedCount),
+          pendingOrganizerReviews: Math.max(0, nextPendingCount),
+        },
+        users: current.users.map((item) => item._id === organizerId ? {
+          ...item,
+          verificationStatus,
+          verificationNotes,
+        } : item),
+      };
+    });
+  };
+
+  const handleApproveOrganizer = async (organizerId: string) => {
+    setProcessingOrganizerId(organizerId);
+    try {
+      const organizer = await adminService.approveOrganizerVerification(organizerId);
+      if (organizer) {
+        updateOrganizerState(organizerId, organizer.verificationStatus, organizer.verificationNotes || '');
+      }
+      showToast('Organizer verified', 'success');
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Unable to verify organizer'), 'error');
+    } finally {
+      setProcessingOrganizerId('');
+    }
+  };
+
+  const handleRejectOrganizer = async (organizerId: string) => {
+    setProcessingOrganizerId(organizerId);
+    try {
+      const organizer = await adminService.rejectOrganizerVerification(organizerId);
+      if (organizer) {
+        updateOrganizerState(organizerId, organizer.verificationStatus, organizer.verificationNotes || '');
+      }
+      showToast('Organizer review updated', 'success');
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Unable to update organizer review'), 'error');
+    } finally {
+      setProcessingOrganizerId('');
+    }
+  };
+
   const stats = overview ? [
     { label: 'Users', value: overview.summary.users, icon: Users },
     { label: 'Organizers', value: overview.summary.organizers, icon: Shield },
+    { label: 'Verified', value: overview.summary.verifiedOrganizers, icon: Shield },
+    { label: 'Pending KYC', value: overview.summary.pendingOrganizerReviews, icon: Shield },
     { label: 'Services', value: overview.summary.services, icon: BriefcaseBusiness },
     { label: 'Bookings', value: overview.summary.bookings, icon: CalendarDays },
     { label: 'Payments', value: overview.summary.payments, icon: CreditCard },
@@ -119,6 +183,10 @@ const AdminDashboard: React.FC = () => {
   const pendingPayments = useMemo(
     () => overview?.payments.filter((payment) => payment.status === 'pending') || [],
     [overview?.payments],
+  );
+  const pendingOrganizerReviews = useMemo(
+    () => overview?.users.filter((user) => user.role === 'organizer' && user.verificationStatus === 'pending') || [],
+    [overview?.users],
   );
 
   return (
@@ -132,13 +200,13 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3 xl:grid-cols-5">
-            {Array.from({ length: 5 }).map((_, index) => (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3 xl:grid-cols-7">
+            {Array.from({ length: 7 }).map((_, index) => (
               <Skeleton key={index} className="h-36" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3 xl:grid-cols-7">
             {stats.map((stat, index) => (
               <motion.div key={stat.label} className="border border-noir-border bg-noir-card p-8" {...reveal} transition={{ ...reveal.transition, delay: index * 0.04 }}>
                 <stat.icon className="h-6 w-6 text-noir-accent" />
@@ -148,6 +216,77 @@ const AdminDashboard: React.FC = () => {
             ))}
           </div>
         )}
+
+        <motion.section className="border border-noir-border bg-noir-card p-8" {...reveal}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-display font-semibold uppercase tracking-wide text-noir-ink">Organizer verification queue</h2>
+              <p className="mt-2 text-xs uppercase tracking-wide text-noir-muted">
+                Review organizer business details, payout readiness, and response SLA before showing the verified badge.
+              </p>
+            </div>
+            <div className="border border-noir-border bg-noir-bg px-4 py-3 text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">
+              {pendingOrganizerReviews.length} awaiting review
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {loading ? (
+              Array.from({ length: 2 }).map((_, index) => <Skeleton key={index} className="h-40" />)
+            ) : pendingOrganizerReviews.length ? pendingOrganizerReviews.map((organizer) => {
+              const isBusy = processingOrganizerId === organizer._id;
+
+              return (
+                <motion.div key={organizer._id} className="border border-noir-border bg-noir-bg p-6" {...reveal}>
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-lg font-display font-semibold uppercase tracking-wide text-noir-ink">{getUserDisplayName(organizer)}</p>
+                        <p className="mt-2 text-[10px] font-mono font-semibold uppercase tracking-[0.35em] text-noir-accent">
+                          {organizer.businessType || 'Business type missing'} | {organizer.businessLocation || 'Location missing'}
+                        </p>
+                      </div>
+                      <p className="text-xs uppercase tracking-wide text-noir-muted">
+                        Business: {organizer.businessName || 'Not provided'} | UPI: {organizer.upiId || 'Not provided'}
+                      </p>
+                      <p className="text-xs uppercase tracking-wide text-noir-muted">
+                        SLA: {organizer.responseTimeHours ? `${organizer.responseTimeHours}h` : 'Not provided'} | Submitted {formatDate(organizer.verificationSubmittedAt || organizer.createdAt || '')}
+                      </p>
+                      {organizer.verificationNotes && (
+                        <p className="text-xs uppercase tracking-wide text-noir-muted">Note: {organizer.verificationNotes}</p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => void handleApproveOrganizer(organizer._id)}
+                        disabled={isBusy}
+                        className="btn-noir !rounded-none !px-5 !py-3"
+                      >
+                        {isBusy ? 'Updating...' : 'Approve'}
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => void handleRejectOrganizer(organizer._id)}
+                        disabled={isBusy}
+                        className="btn-outline-noir !rounded-none !px-5 !py-3"
+                      >
+                        Reject
+                      </motion.button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            }) : (
+              <div className="border border-dashed border-noir-border px-4 py-8 text-center text-xs font-mono font-semibold uppercase tracking-[0.25em] text-noir-muted">
+                No organizer reviews pending.
+              </div>
+            )}
+          </div>
+        </motion.section>
 
         <motion.section className="border border-noir-border bg-noir-card p-8" {...reveal}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -240,6 +379,11 @@ const AdminDashboard: React.FC = () => {
                 <div key={user._id} className="border border-noir-border bg-noir-bg px-5 py-4">
                   <p className="text-sm font-display font-semibold uppercase tracking-wide text-noir-ink">{getUserDisplayName(user)}</p>
                   <p className="mt-2 text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-accent">{user.role}</p>
+                  {user.role === 'organizer' && (
+                    <p className="mt-2 text-[10px] font-mono font-semibold uppercase tracking-[0.25em] text-noir-muted">
+                      {(user.verificationStatus || 'unverified').replace('_', ' ')}
+                    </p>
+                  )}
                   <p className="mt-2 text-xs uppercase tracking-wide text-noir-muted">{user.email}</p>
                 </div>
               )) : (

@@ -116,9 +116,10 @@ export const Footer: React.FC = () => {
               © 2026 EVENTO Global Inc. All rights reserved.
             </p>
             <div className="flex flex-wrap justify-center gap-8 md:gap-12">
-              <a href="#" className="text-noir-muted/40 hover:text-noir-accent text-[10px] font-semibold uppercase tracking-[0.4em] transition-colors">Privacy Policy</a>
-              <a href="#" className="text-noir-muted/40 hover:text-noir-accent text-[10px] font-semibold uppercase tracking-[0.4em] transition-colors">Terms of Service</a>
-              <a href="#" className="text-noir-muted/40 hover:text-noir-accent text-[10px] font-semibold uppercase tracking-[0.4em] transition-colors">Cookie Settings</a>
+              <Link to="/privacy" className="text-noir-muted/40 hover:text-noir-accent text-[10px] font-semibold uppercase tracking-[0.4em] transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="text-noir-muted/40 hover:text-noir-accent text-[10px] font-semibold uppercase tracking-[0.4em] transition-colors">Terms of Service</Link>
+              <Link to="/refund-policy" className="text-noir-muted/40 hover:text-noir-accent text-[10px] font-semibold uppercase tracking-[0.4em] transition-colors">Refund Policy</Link>
+              <Link to="/cancellation-policy" className="text-noir-muted/40 hover:text-noir-accent text-[10px] font-semibold uppercase tracking-[0.4em] transition-colors">Cancellation Policy</Link>
             </div>
           </div>
 

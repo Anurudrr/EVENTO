@@ -1,5 +1,11 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const getTrimmedEnv = (key: string) => process.env[key]?.trim();
+
 const getRequiredEnv = (key: string) => {
-  const value = process.env[key]?.trim();
+  const value = getTrimmedEnv(key);
 
   if (!value) {
     throw new Error(`Missing required environment variable: ${key}`);
@@ -8,7 +14,30 @@ const getRequiredEnv = (key: string) => {
   return value;
 };
 
-const getOptionalEnv = (key: string) => process.env[key]?.trim() || '';
+const getOptionalEnv = (key: string) => getTrimmedEnv(key) || '';
+const getBooleanEnv = (key: string, fallback = false) => {
+  const value = getOptionalEnv(key).toLowerCase();
+
+  if (!value) {
+    return fallback;
+  }
+
+  if (['1', 'true', 'yes', 'on'].includes(value)) {
+    return true;
+  }
+
+  if (['0', 'false', 'no', 'off'].includes(value)) {
+    return false;
+  }
+
+  return fallback;
+};
+
+const getPositiveNumberEnv = (key: string, fallback: number) => {
+  const parsedValue = Number(getOptionalEnv(key));
+
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+};
 
 const ensureNotPlaceholder = (key: string, value: string) => {
   const normalized = value.trim().toLowerCase();
@@ -45,15 +74,42 @@ const isPlaceholderValue = (value: string) => {
 
 export const getJwtSecret = () => getRequiredEnv('JWT_SECRET');
 export const getMongoUri = () => getRequiredEnv('MONGO_URI');
-export const getOtpSecret = () => process.env.OTP_SECRET?.trim() || getJwtSecret();
 export const getGoogleClientId = () => getRequiredEnv('GOOGLE_CLIENT_ID');
-export const getJwtExpire = () => process.env.JWT_EXPIRE?.trim() || '30d';
-export const getJwtCookieName = () => process.env.JWT_COOKIE_NAME?.trim() || 'evento_auth';
+export const getJwtExpire = () => getOptionalEnv('JWT_EXPIRE') || '30d';
+export const getJwtCookieName = () => getOptionalEnv('JWT_COOKIE_NAME') || 'evento_auth';
+export const getNodeEnv = () => getOptionalEnv('NODE_ENV') || 'development';
+export const isProductionEnv = () => getNodeEnv() === 'production';
+export const isDevelopmentEnv = () => getNodeEnv() === 'development';
+export const hasEnvValue = (key: string) => Boolean(getOptionalEnv(key));
+export const getServerHost = () => getOptionalEnv('HOST') || '0.0.0.0';
+export const getServerPort = () => getPositiveNumberEnv('PORT', 3000);
+export const getFallbackPort = () => getPositiveNumberEnv('FALLBACK_PORT', 3001);
+export const isDirectRegistrationEnabled = () => getBooleanEnv('ALLOW_DIRECT_REGISTER', false);
+
+export const getCorsOrigins = (): true | string[] => {
+  const configuredOrigins = getOptionalEnv('CORS_ORIGIN');
+
+  if (!configuredOrigins) {
+    return true;
+  }
+
+  const origins = configuredOrigins
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return origins.length > 0 ? origins : true;
+};
+
+export const getRateLimitConfig = () => ({
+  windowMs: getPositiveNumberEnv('RATE_LIMIT_WINDOW', 15) * 60 * 1000,
+  max: getPositiveNumberEnv('RATE_LIMIT_MAX', 100),
+});
 
 export const getEmailTransportConfig = () => {
-  const host = process.env.SMTP_HOST?.trim();
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS?.trim();
+  const host = getOptionalEnv('SMTP_HOST');
+  const user = getOptionalEnv('SMTP_USER');
+  const pass = getOptionalEnv('SMTP_PASS');
 
   if (!host) {
     return null;
@@ -61,11 +117,25 @@ export const getEmailTransportConfig = () => {
 
   return {
     host,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true',
+    port: getPositiveNumberEnv('SMTP_PORT', 587),
+    secure: getOptionalEnv('SMTP_SECURE').toLowerCase() === 'true',
     auth: user && pass ? { user, pass } : undefined,
-    from: process.env.SMTP_FROM?.trim() || 'EVENTO <no-reply@evento.local>',
+    from: getOptionalEnv('SMTP_FROM') || 'EVENTO <no-reply@evento.local>',
   };
+};
+
+export const getOtpDeliveryMode = (): 'email' | 'mock' => {
+  const configuredMode = getOptionalEnv('OTP_DELIVERY_MODE').toLowerCase();
+
+  if (configuredMode === 'email') {
+    return 'email';
+  }
+
+  if (configuredMode === 'mock') {
+    return 'mock';
+  }
+
+  return getEmailTransportConfig() ? 'email' : 'mock';
 };
 
 export const hasRazorpayCredentials = () => {
@@ -111,6 +181,6 @@ export const getCloudinaryConfig = () => {
     cloudName,
     apiKey,
     apiSecret,
-    folder: process.env.CLOUDINARY_FOLDER?.trim() || 'evento',
+    folder: getOptionalEnv('CLOUDINARY_FOLDER') || 'evento',
   };
 };

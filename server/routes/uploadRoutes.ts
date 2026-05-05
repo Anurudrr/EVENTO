@@ -2,20 +2,9 @@ import express from 'express';
 import multer from 'multer';
 import { protect, authorize } from '../middleware/authMiddleware.ts';
 import { uploadImageBuffer } from '../utils/cloudinary.ts';
+import { checkImageFile } from '../utils/upload.ts';
 
 const router = express.Router();
-
-function checkFileType(file: Express.Multer.File, cb: multer.FileFilterCallback) {
-  const filetypes = /jpeg|jpg|png|webp/;
-  const extname = filetypes.test(file.originalname.split('.').pop()?.toLowerCase() || '');
-  const mimetype = filetypes.test(file.mimetype);
-
-  if (extname && mimetype) {
-    return cb(null, true);
-  } else {
-    cb(new Error('Images only!'));
-  }
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -23,7 +12,7 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024,
   },
   fileFilter: function (req, file, cb) {
-    checkFileType(file, cb);
+    checkImageFile(file, cb);
   },
 });
 

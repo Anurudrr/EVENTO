@@ -6,6 +6,7 @@ import { ServiceCard } from '../components/ServiceCard';
 import { serviceService } from '../services/serviceService';
 import { Service } from '../types';
 import { CATEGORIES } from '../constants';
+import { FALLBACK_IMAGE_URL } from '../utils';
 
 const CategoryPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -68,13 +69,13 @@ const CategoryPage: React.FC = () => {
           initial={{ scale: 1.1 }}
           animate={{ scale: 1 }}
           transition={{ duration: 1.5, ease: "easeOut" }}
-          src={category.image || '/images/placeholder.png'}
+          src={category.image || FALLBACK_IMAGE_URL}
           alt={category.name}
           className="w-full h-full object-cover"
           loading="eager"
           referrerPolicy="no-referrer"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = '/images/placeholder.png';
+            (e.target as HTMLImageElement).src = FALLBACK_IMAGE_URL;
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-noir-bg/40 via-noir-bg/80 to-noir-bg" />
@@ -268,7 +269,7 @@ const CategoryPage: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 * (index % 6) }}
                     >
-                      <ServiceCard service={service} />
+                      <ServiceCard service={service} withEntryAnimation={false} />
                     </motion.div>
                   ))}
                 </motion.div>

@@ -9,7 +9,7 @@ const wishlistPopulate = {
   path: 'serviceIds',
   populate: {
     path: 'organizer',
-    select: 'name email role profilePicture bio createdAt upiId',
+    select: 'name email role profilePicture bio createdAt upiId businessName businessType businessLocation responseTimeHours verificationStatus verificationNotes verificationSubmittedAt verifiedAt',
   },
 };
 
@@ -88,7 +88,6 @@ export const getProfile = async (req: any, res: Response, next: NextFunction) =>
 
 export const uploadProfilePicture = async (req: any, res: Response, next: NextFunction) => {
   try {
-    console.log('[user:upload-pfp]', req.originalUrl);
     const uploadedFile = getUploadedFile(req);
 
     if (!uploadedFile) {
@@ -127,6 +126,14 @@ export const updateProfile = async (req: any, res: Response, next: NextFunction)
   try {
     const requestBody = req.body && typeof req.body === 'object' ? req.body : {};
     const uploadedFile = getUploadedFile(req);
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
 
     let profilePicture = typeof requestBody.profilePicture === 'string'
       ? requestBody.profilePicture.trim()
@@ -143,24 +150,75 @@ export const updateProfile = async (req: any, res: Response, next: NextFunction)
       });
     }
 
-    const fieldsToUpdate = {
-      ...(typeof requestBody.name === 'string' ? { name: requestBody.name.trim() } : {}),
-      ...(typeof requestBody.bio === 'string' ? { bio: requestBody.bio.trim() } : {}),
-      ...(typeof requestBody.upiId === 'string' ? { upiId: requestBody.upiId.trim() } : {}),
-      ...(profilePicture !== undefined ? { profilePicture } : {}),
-    };
-
-    const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
+    if (typeof requestBody.name === 'string') {
+      user.name = requestBody.name.trim();
     }
+
+    if (typeof requestBody.bio === 'string') {
+      user.bio = requestBody.bio.trim();
+    }
+
+    if (profilePicture !== undefined) {
+      user.profilePicture = profilePicture;
+    }
+
+    if (user.role === 'organizer') {
+      const nextUpiId = typeof requestBody.upiId === 'string' ? requestBody.upiId.trim() : user.upiId || '';
+      const nextBusinessName = typeof requestBody.businessName === 'string' ? requestBody.businessName.trim() : user.businessName || '';
+      const nextBusinessType = typeof requestBody.businessType === 'string' ? requestBody.businessType.trim() : user.businessType || '';
+      const nextBusinessLocation = typeof requestBody.businessLocation === 'string' ? requestBody.businessLocation.trim() : user.businessLocation || '';
+      const hasResponseTimeInput = requestBody.responseTimeHours !== undefined && requestBody.responseTimeHours !== null && requestBody.responseTimeHours !== '';
+      const parsedResponseTimeHours = hasResponseTimeInput ? Number(requestBody.responseTimeHours) : Number(user.responseTimeHours || 24);
+
+      if (nextUpiId && !/^[\w.-]{2,}@[A-Za-z]{2,}$/.test(nextUpiId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please provide a valid UPI ID such as name@bank',
+        });
+      }
+
+      if (!Number.isFinite(parsedResponseTimeHours) || parsedResponseTimeHours < 1 || parsedResponseTimeHours > 168) {
+        return res.status(400).json({
+          success: false,
+          error: 'Response time must be between 1 and 168 hours',
+        });
+      }
+
+      user.upiId = nextUpiId;
+      user.businessName = nextBusinessName;
+      user.businessType = nextBusinessType;
+      user.businessLocation = nextBusinessLocation;
+      user.responseTimeHours = parsedResponseTimeHours;
+
+      const hasVerificationPayload = Boolean(
+        nextUpiId
+        && nextBusinessName
+        && nextBusinessType
+        && nextBusinessLocation
+        && parsedResponseTimeHours,
+      );
+      const trustFieldsTouched = [
+        'upiId',
+        'businessName',
+        'businessType',
+        'businessLocation',
+        'responseTimeHours',
+      ].some((field) => Object.prototype.hasOwnProperty.call(requestBody, field));
+
+      if (trustFieldsTouched && user.verificationStatus !== 'verified') {
+        if (hasVerificationPayload) {
+          user.verificationStatus = 'pending';
+          user.verificationSubmittedAt = new Date();
+          user.verificationNotes = 'Organizer profile submitted for review.';
+        } else {
+          user.verificationStatus = 'unverified';
+          user.verificationNotes = '';
+          user.verificationSubmittedAt = undefined;
+        }
+      }
+    }
+
+    await user.save();
 
     res.status(200).json({
       success: true,

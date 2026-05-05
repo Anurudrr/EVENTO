@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { isLowPowerDevice, shouldEnablePointerEffects, shouldReduceMotion } from '../../utils/performance';
 
 const createRenderer = (canvas: HTMLCanvasElement) => {
   const renderer = new THREE.WebGLRenderer({
@@ -11,21 +12,25 @@ const createRenderer = (canvas: HTMLCanvasElement) => {
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
 
   return renderer;
 };
 
-export const CinematicHeroCanvas: React.FC = () => {
+export const CinematicHeroCanvas: React.FC = React.memo(() => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<number>(0);
+  const isVisibleRef = useRef(true);
+  const isInViewRef = useRef(true);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!canvas || typeof window === 'undefined' || shouldReduceMotion()) {
       return undefined;
     }
 
+    const lowPowerMode = isLowPowerDevice();
+    const pointerEffectsEnabled = shouldEnablePointerEffects();
     const renderer = createRenderer(canvas);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 100);
@@ -45,7 +50,9 @@ export const CinematicHeroCanvas: React.FC = () => {
     glowMesh.scale.set(1.2, 0.85, 1.15);
     group.add(glowMesh);
 
-    const particleCount = window.innerWidth < 768 ? 420 : 860;
+    const particleCount = window.innerWidth < 768
+      ? (lowPowerMode ? 110 : 160)
+      : (lowPowerMode ? 180 : 260);
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
     const scales = new Float32Array(particleCount);
@@ -98,6 +105,10 @@ export const CinematicHeroCanvas: React.FC = () => {
 
     let pointerX = 0;
     let pointerY = 0;
+    let lastRenderTime = 0;
+    const frameIntervalMs = lowPowerMode ? 1000 / 18 : 1000 / 30;
+
+    const shouldAnimate = () => isVisibleRef.current && isInViewRef.current;
 
     const updateSize = () => {
       const parent = canvas.parentElement;
@@ -110,6 +121,10 @@ export const CinematicHeroCanvas: React.FC = () => {
     };
 
     const handlePointerMove = (event: PointerEvent) => {
+      if (!pointerEffectsEnabled) {
+        return;
+      }
+
       const normalizedX = (event.clientX / window.innerWidth) - 0.5;
       const normalizedY = (event.clientY / window.innerHeight) - 0.5;
       pointerX = normalizedX * 0.85;
@@ -117,6 +132,17 @@ export const CinematicHeroCanvas: React.FC = () => {
     };
 
     const animate = (time: number) => {
+      if (!shouldAnimate()) {
+        frameRef.current = 0;
+        return;
+      }
+
+      if (time - lastRenderTime < frameIntervalMs) {
+        frameRef.current = window.requestAnimationFrame(animate);
+        return;
+      }
+
+      lastRenderTime = time;
       const elapsed = time * 0.00025;
       group.rotation.y += 0.0014;
       group.rotation.x += 0.00035;
@@ -130,22 +156,67 @@ export const CinematicHeroCanvas: React.FC = () => {
       frameRef.current = window.requestAnimationFrame(animate);
     };
 
+    const startAnimation = () => {
+      if (!frameRef.current && shouldAnimate()) {
+        frameRef.current = window.requestAnimationFrame(animate);
+      }
+    };
+
+    const stopAnimation = () => {
+      if (frameRef.current) {
+        window.cancelAnimationFrame(frameRef.current);
+        frameRef.current = 0;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      isVisibleRef.current = !document.hidden;
+
+      if (shouldAnimate()) {
+        startAnimation();
+      } else {
+        stopAnimation();
+      }
+    };
+
     const resizeObserver = new ResizeObserver(updateSize);
     if (canvas.parentElement) {
       resizeObserver.observe(canvas.parentElement);
     }
 
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      isInViewRef.current = entry?.isIntersecting ?? true;
+
+      if (shouldAnimate()) {
+        startAnimation();
+      } else {
+        stopAnimation();
+      }
+    }, {
+      threshold: 0.01,
+    });
+
+    intersectionObserver.observe(canvas);
+
     window.addEventListener('resize', updateSize);
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    if (pointerEffectsEnabled) {
+      window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     updateSize();
-    frameRef.current = window.requestAnimationFrame(animate);
+    handleVisibilityChange();
+    startAnimation();
 
     return () => {
-      window.cancelAnimationFrame(frameRef.current);
+      stopAnimation();
       window.removeEventListener('resize', updateSize);
-      window.removeEventListener('pointermove', handlePointerMove);
+      if (pointerEffectsEnabled) {
+        window.removeEventListener('pointermove', handlePointerMove);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       resizeObserver.disconnect();
+      intersectionObserver.disconnect();
       particleGeometry.dispose();
       particleMaterial.dispose();
       glowGeometry.dispose();
@@ -155,4 +226,4 @@ export const CinematicHeroCanvas: React.FC = () => {
   }, []);
 
   return <canvas ref={canvasRef} className="hero-canvas" aria-hidden="true" />;
-};
+});

@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import path from 'path';
 import { mkdir, writeFile } from 'fs/promises';
-import { getCloudinaryConfig } from './env.ts';
+import { getCloudinaryConfig, isDevelopmentEnv } from './env.ts';
+import { detectImageFormat, getNormalizedImageExtension, getSafeImageFilename } from './upload.ts';
 
 const buildSignature = (params: Record<string, string>, apiSecret: string) => {
   const signatureBase = Object.entries(params)
@@ -16,7 +17,12 @@ const saveImageLocally = async (buffer: Buffer, filename: string, folderSuffix: 
   const uploadsRoot = path.join(process.cwd(), 'uploads', folderSuffix);
   await mkdir(uploadsRoot, { recursive: true });
 
-  const extension = path.extname(filename) || '.png';
+  const format = detectImageFormat(buffer);
+  if (!format) {
+    throw new Error('Images only!');
+  }
+
+  const extension = getNormalizedImageExtension(format);
   const safeName = `${Date.now()}-${crypto.randomUUID()}${extension}`;
   const filePath = path.join(uploadsRoot, safeName);
 
@@ -30,6 +36,12 @@ export const uploadImageBuffer = async (
   filename: string,
   folderSuffix: string,
 ) => {
+  const format = detectImageFormat(buffer);
+  if (!format) {
+    throw new Error('Images only!');
+  }
+
+  const safeFilename = getSafeImageFilename(filename, format);
   let cloudinaryConfig: ReturnType<typeof getCloudinaryConfig> | null = null;
 
   try {
@@ -45,9 +57,10 @@ export const uploadImageBuffer = async (
   const { cloudName, apiKey, apiSecret, folder } = cloudinaryConfig;
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const uploadFolder = `${folder}/${folderSuffix}`;
+  const safePublicIdBase = path.basename(safeFilename, path.extname(safeFilename));
   const paramsToSign = {
     folder: uploadFolder,
-    public_id: `${Date.now()}-${filename.replace(/\.[^/.]+$/, '')}`,
+    public_id: `${Date.now()}-${safePublicIdBase}`,
     timestamp,
   };
 
@@ -55,7 +68,7 @@ export const uploadImageBuffer = async (
   const formData = new FormData();
   const blob = new Blob([buffer]);
 
-  formData.append('file', blob, filename);
+  formData.append('file', blob, safeFilename);
   formData.append('api_key', apiKey);
   formData.append('timestamp', timestamp);
   formData.append('folder', uploadFolder);
@@ -86,12 +99,14 @@ export const uploadImageBuffer = async (
     data = null;
   }
 
-  console.log('Cloudinary upload response:', {
-    ok: response.ok,
-    status: response.status,
-    secure_url: data?.secure_url,
-    error: data?.error,
-  });
+  if (isDevelopmentEnv()) {
+    console.log('Cloudinary upload response:', {
+      ok: response.ok,
+      status: response.status,
+      secure_url: data?.secure_url,
+      error: data?.error,
+    });
+  }
 
   if (!response.ok || !data.secure_url) {
     const cloudinaryMessage = data?.error?.message;

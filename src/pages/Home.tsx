@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Hero } from '../sections/Hero';
@@ -6,42 +6,46 @@ import { Values } from '../sections/Values';
 import { SceneSection } from '../components/experience/SceneSection';
 import { ServiceCard } from '../components/ServiceCard';
 import { CategoryCard } from '../components/CategoryCard';
+import { Seo } from '../components/Seo';
 import { CATEGORIES } from '../constants';
 import { serviceService } from '../services/serviceService';
 import { Service } from '../types';
+import { useNearViewport } from '../hooks/useNearViewport';
 
 const Portfolio = lazy(() => import('../sections/Portfolio').then((module) => ({ default: module.Portfolio })));
 const Gallery = lazy(() => import('../sections/Gallery').then((module) => ({ default: module.Gallery })));
+const EventoMap = lazy(() => import('../components/EventoMap').then((module) => ({ default: module.EventoMap })));
 
 const Home: React.FC = () => {
   const [topRated, setTopRated] = useState<Service[]>([]);
   const [latestArrivals, setLatestArrivals] = useState<Service[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [mapServices, setMapServices] = useState<Service[]>([]);
+  const [mapError, setMapError] = useState('');
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [hasRequestedMap, setHasRequestedMap] = useState(false);
+  const deferredMapServices = useDeferredValue(mapServices);
+  const { ref: mapSectionRef, isNearViewport: shouldLoadMapSection } = useNearViewport<HTMLElement>('480px');
 
   useEffect(() => {
     let mounted = true;
 
     const loadHomeServices = async () => {
-      setIsLoading(true);
+      setServicesLoading(true);
 
       try {
-        const [ratedServices, recentServices] = await Promise.all([
+        const [ratedResult, recentResult] = await Promise.allSettled([
           serviceService.getServices({ limit: 6, sort: 'rating' }),
           serviceService.getServices({ limit: 4, sort: 'newest' }),
         ]);
 
         if (mounted) {
-          setTopRated(ratedServices.slice(0, 6));
-          setLatestArrivals(recentServices.slice(0, 4));
-        }
-      } catch {
-        if (mounted) {
-          setTopRated([]);
-          setLatestArrivals([]);
+          setTopRated(ratedResult.status === 'fulfilled' ? ratedResult.value.slice(0, 6) : []);
+          setLatestArrivals(recentResult.status === 'fulfilled' ? recentResult.value.slice(0, 4) : []);
         }
       } finally {
         if (mounted) {
-          setIsLoading(false);
+          setServicesLoading(false);
         }
       }
     };
@@ -52,6 +56,41 @@ const Home: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!shouldLoadMapSection || hasRequestedMap) {
+      return undefined;
+    }
+
+    let mounted = true;
+    setHasRequestedMap(true);
+    setMapLoading(true);
+    setMapError('');
+
+    const loadMapServices = async () => {
+      try {
+        const result = await serviceService.getMappedServices();
+        if (mounted) {
+          setMapServices(result);
+        }
+      } catch {
+        if (mounted) {
+          setMapError('Live location markers are temporarily unavailable.');
+          setMapServices([]);
+        }
+      } finally {
+        if (mounted) {
+          setMapLoading(false);
+        }
+      }
+    };
+
+    void loadMapServices();
+
+    return () => {
+      mounted = false;
+    };
+  }, [hasRequestedMap, shouldLoadMapSection]);
 
   const featuredCategories = useMemo(
     () => CATEGORIES.slice(0, 4).map((category) => (
@@ -74,6 +113,17 @@ const Home: React.FC = () => {
 
   return (
     <main className="bg-noir-bg">
+      <Seo
+        title="Premium Event Services Marketplace"
+        description="Discover photographers, planners, decorators, caterers, and other premium event professionals on EVENTO."
+        path="/"
+        structuredData={{
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'EVENTO',
+          url: typeof window === 'undefined' ? '/' : window.location.origin,
+        }}
+      />
       <Hero />
 
       <SceneSection className="scene-section--light border-y border-noir-border">
@@ -85,7 +135,7 @@ const Home: React.FC = () => {
                 Discover the partners shaping every <span>celebration.</span>
               </h2>
               <p data-scene-reveal className="scene-description">
-                Browse live service cards with verified details, pricing, imagery, and booking-ready presentation.
+                Browse live service cards with organizer verification status, pricing, imagery, and booking-ready presentation.
                 The marketplace remains fully functional while the earlier cinematic experience stays intact.
               </p>
             </div>
@@ -106,12 +156,12 @@ const Home: React.FC = () => {
           </div>
 
           <div className="mt-16 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
-            {isLoading ? (
+            {servicesLoading ? (
               renderSkeletons(6)
             ) : topRated.length > 0 ? (
               topRated.map((service) => (
                 <div key={service._id} data-scene-reveal>
-                  <ServiceCard service={service} />
+                  <ServiceCard service={service} withEntryAnimation={false} />
                 </div>
               ))
             ) : (
@@ -193,12 +243,12 @@ const Home: React.FC = () => {
           </div>
 
           <div className="mt-16 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-10">
-            {isLoading ? (
+            {servicesLoading ? (
               renderSkeletons(4)
             ) : latestArrivals.length > 0 ? (
               latestArrivals.map((service) => (
                 <div key={service._id} data-scene-reveal>
-                  <ServiceCard service={service} />
+                  <ServiceCard service={service} withEntryAnimation={false} />
                 </div>
               ))
             ) : (
@@ -207,6 +257,47 @@ const Home: React.FC = () => {
                   No recent services are available right now.
                 </p>
               </div>
+            )}
+          </div>
+        </div>
+      </SceneSection>
+
+      <SceneSection className="scene-section--contrast border-b border-noir-border">
+        <div className="container mx-auto px-6 py-24 md:py-32">
+          <div ref={mapSectionRef} className="flex flex-col gap-12 xl:flex-row xl:items-end xl:justify-between">
+            <div className="scene-copy">
+              <span data-scene-reveal className="scene-kicker">OpenStreetMap Venue View</span>
+              <h2 data-scene-reveal className="scene-title max-w-[13ch]">
+                Track mapped event locations across the <span>marketplace.</span>
+              </h2>
+              <p data-scene-reveal className="scene-description">
+                Public venue pins render from organizer submissions, so visitors can inspect exact coordinates before opening a listing.
+              </p>
+            </div>
+
+            <div data-scene-reveal className="noir-card max-w-xl">
+              <p className="text-[10px] font-semibold text-noir-accent uppercase tracking-[0.4em] mb-6">
+                Live marker stream
+              </p>
+              <p className="text-lg md:text-xl text-noir-muted leading-relaxed font-light">
+                Popups expose each event title, date metadata, and location without adding any paid map dependency.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-16" data-scene-reveal>
+            {shouldLoadMapSection ? (
+              <Suspense fallback={<div className="h-[520px] border border-noir-border bg-white/80 skeleton-shimmer" />}>
+                <EventoMap
+                  events={deferredMapServices}
+                  loading={mapLoading}
+                  error={mapError}
+                  emptyMessage="Event locations will appear here once organizers publish mapped venues."
+                  height={520}
+                />
+              </Suspense>
+            ) : (
+              <div className="h-[520px] border border-noir-border bg-white/80 skeleton-shimmer" />
             )}
           </div>
         </div>

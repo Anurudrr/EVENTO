@@ -22,5 +22,10 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "_github_repo",
+    "dist",
+    "node_modules"
+  ]
 }

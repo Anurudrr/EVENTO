@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import Service from '../models/Service.ts';
 import { uploadImageBuffer } from '../utils/cloudinary.ts';
 import { toDateKey } from '../utils/date.ts';
+import { isDevelopmentEnv } from '../utils/env.ts';
 import { isSmokeTestService } from '../utils/smokeArtifacts.ts';
 
 const parseStringArrayField = (value: unknown) => {
@@ -28,6 +29,45 @@ const parseStringArrayField = (value: unknown) => {
   }
 
   return [] as string[];
+};
+
+const parseJsonArrayField = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [] as unknown[];
+};
+
+const sanitizeStringList = (value: unknown, maxItems = 12, maxLength = 160) => (
+  parseStringArrayField(value)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, maxItems)
+    .map((item) => item.slice(0, maxLength))
+);
+
+const parseBoolean = (value: unknown) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return value === 'true';
+  }
+
+  return false;
 };
 
 const normalizeIncomingImageValue = (image: string) => {
@@ -122,6 +162,40 @@ const parseNumber = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const parseCoordinate = (value: unknown, min: number, max: number) => {
+  const parsed = parseNumber(value);
+
+  if (parsed === undefined || parsed < min || parsed > max) {
+    return undefined;
+  }
+
+  return parsed;
+};
+
+const resolveCoordinates = (
+  payload: Record<string, unknown>,
+  fallback?: { lat?: number; lng?: number },
+) => {
+  const hasLatField = Object.prototype.hasOwnProperty.call(payload, 'lat');
+  const hasLngField = Object.prototype.hasOwnProperty.call(payload, 'lng');
+
+  if (!hasLatField && !hasLngField) {
+    return fallback || {};
+  }
+
+  const lat = parseCoordinate(payload.lat, -90, 90);
+  const lng = parseCoordinate(payload.lng, -180, 180);
+
+  if (lat === undefined || lng === undefined) {
+    return {
+      lat: undefined,
+      lng: undefined,
+    };
+  }
+
+  return { lat, lng };
+};
+
 const parsePositiveInteger = (value: unknown) => {
   const parsed = parseNumber(value);
 
@@ -131,6 +205,53 @@ const parsePositiveInteger = (value: unknown) => {
 
   return parsed;
 };
+
+const parsePackagesField = (value: unknown) => (
+  parseJsonArrayField(value)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    .map((entry) => ({
+      _id: typeof entry._id === 'string' && entry._id.trim() ? entry._id.trim() : undefined,
+      name: typeof entry.name === 'string' ? entry.name.trim() : '',
+      description: typeof entry.description === 'string' ? entry.description.trim() : '',
+      price: parseNumber(entry.price) ?? 0,
+      guestLimit: parsePositiveInteger(entry.guestLimit),
+      isFeatured: parseBoolean(entry.isFeatured),
+      deliverables: sanitizeStringList(entry.deliverables, 8, 140),
+    }))
+    .filter((entry) => entry.name && entry.price >= 0)
+    .slice(0, 6)
+);
+
+const parseAddOnsField = (value: unknown) => (
+  parseJsonArrayField(value)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    .map((entry) => ({
+      _id: typeof entry._id === 'string' && entry._id.trim() ? entry._id.trim() : undefined,
+      name: typeof entry.name === 'string' ? entry.name.trim() : '',
+      description: typeof entry.description === 'string' ? entry.description.trim() : '',
+      price: parseNumber(entry.price) ?? 0,
+    }))
+    .filter((entry) => entry.name && entry.price >= 0)
+    .slice(0, 10)
+);
+
+const parseCustomQuestionsField = (value: unknown) => (
+  parseJsonArrayField(value)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    .map((entry) => {
+      const type = typeof entry.type === 'string' ? entry.type.trim() : 'text';
+      return {
+        _id: typeof entry._id === 'string' && entry._id.trim() ? entry._id.trim() : undefined,
+        label: typeof entry.label === 'string' ? entry.label.trim() : '',
+        type: ['text', 'textarea', 'number', 'select'].includes(type) ? type : 'text',
+        required: parseBoolean(entry.required),
+        placeholder: typeof entry.placeholder === 'string' ? entry.placeholder.trim() : '',
+        options: sanitizeStringList(entry.options, 8, 80),
+      };
+    })
+    .filter((entry) => entry.label)
+    .slice(0, 8)
+);
 
 const normalizeSort = (value: unknown) => {
   if (typeof value !== 'string') {
@@ -167,7 +288,7 @@ const getUploadedImages = async (files: Express.Multer.File[] | undefined) => {
 };
 
 const getServicePopulate = () => (
-  'name email role profilePicture bio createdAt upiId'
+  'name email role profilePicture bio createdAt upiId businessName businessType businessLocation responseTimeHours verificationStatus verificationNotes verificationSubmittedAt verifiedAt'
 );
 
 const ensureOrganizerAccess = (service: any, user: any) => {
@@ -177,6 +298,7 @@ const ensureOrganizerAccess = (service: any, user: any) => {
 export const createService = async (req: any, res: Response, next: NextFunction) => {
   try {
     const requestBody = req.body && typeof req.body === 'object' ? req.body : {};
+    const coordinates = resolveCoordinates(requestBody);
     const existingImages = parseStringArrayField(req.body.images);
     const uploadedImages = await getUploadedImages(req.files as Express.Multer.File[] | undefined);
     const images = dedupeImages(existingImages, uploadedImages);
@@ -190,10 +312,21 @@ export const createService = async (req: any, res: Response, next: NextFunction)
       description: requestBody.description,
       price: Number(requestBody.price),
       priceLabel: typeof requestBody.priceLabel === 'string' ? requestBody.priceLabel.trim() : '',
+      bookingMode: requestBody.bookingMode === 'quote' ? 'quote' : 'instant',
+      minimumSpend: parseNumber(requestBody.minimumSpend) ?? 0,
+      advancePercentage: parseNumber(requestBody.advancePercentage) ?? 100,
       category: requestBody.category,
       location: requestBody.location,
+      ...coordinates,
       images,
       upiId: requestBody.upiId.trim(),
+      cancellationPolicy: typeof requestBody.cancellationPolicy === 'string' ? requestBody.cancellationPolicy.trim() : '',
+      refundPolicy: typeof requestBody.refundPolicy === 'string' ? requestBody.refundPolicy.trim() : '',
+      serviceTerms: typeof requestBody.serviceTerms === 'string' ? requestBody.serviceTerms.trim() : '',
+      deliverables: sanitizeStringList(requestBody.deliverables, 10, 160),
+      packages: parsePackagesField(requestBody.packages),
+      addOns: parseAddOnsField(requestBody.addOns),
+      customQuestions: parseCustomQuestionsField(requestBody.customQuestions),
       organizer: req.user.id,
       availability: parseAvailabilityField(requestBody.availability),
     });
@@ -222,6 +355,10 @@ export const updateService = async (req: any, res: Response, next: NextFunction)
       return res.status(403).json({ success: false, error: 'Not authorized to update this service' });
     }
 
+    const coordinates = resolveCoordinates(requestBody, {
+      lat: service.lat,
+      lng: service.lng,
+    });
     const existingImages = parseStringArrayField(requestBody.images);
     const uploadedImages = await getUploadedImages(req.files as Express.Multer.File[] | undefined);
     const images = dedupeImages(
@@ -235,22 +372,20 @@ export const updateService = async (req: any, res: Response, next: NextFunction)
 
     const availability = parseAvailabilityField(requestBody.availability);
 
-    console.log('[service:update:request]', {
-      id: req.params.id,
-      userId: req.user?.id,
-      body: {
+    if (isDevelopmentEnv()) {
+      console.log('[service:update:request]', {
+        id: req.params.id,
+        userId: req.user?.id,
         title: requestBody.title,
-        description: requestBody.description,
         price: requestBody.price,
+        bookingMode: requestBody.bookingMode,
         category: requestBody.category,
         location: requestBody.location,
-        upiId: requestBody.upiId,
-        images: existingImages,
+        uploadedImageCount: uploadedImages.length,
+        mergedImageCount: images.length,
         availabilityCount: availability.length,
-      },
-      uploadedImageCount: uploadedImages.length,
-      mergedImageCount: images.length,
-    });
+      });
+    }
 
     const updatedService = await Service.findByIdAndUpdate(
       req.params.id,
@@ -259,24 +394,38 @@ export const updateService = async (req: any, res: Response, next: NextFunction)
         description: requestBody.description,
         price: Number(requestBody.price),
         priceLabel: typeof requestBody.priceLabel === 'string' ? requestBody.priceLabel.trim() : '',
+        bookingMode: requestBody.bookingMode === 'quote' ? 'quote' : 'instant',
+        minimumSpend: parseNumber(requestBody.minimumSpend) ?? 0,
+        advancePercentage: parseNumber(requestBody.advancePercentage) ?? 100,
         category: requestBody.category,
         location: requestBody.location,
+        lat: coordinates.lat,
+        lng: coordinates.lng,
         images,
         upiId: requestBody.upiId.trim(),
+        cancellationPolicy: typeof requestBody.cancellationPolicy === 'string' ? requestBody.cancellationPolicy.trim() : '',
+        refundPolicy: typeof requestBody.refundPolicy === 'string' ? requestBody.refundPolicy.trim() : '',
+        serviceTerms: typeof requestBody.serviceTerms === 'string' ? requestBody.serviceTerms.trim() : '',
+        deliverables: sanitizeStringList(requestBody.deliverables, 10, 160),
+        packages: parsePackagesField(requestBody.packages),
+        addOns: parseAddOnsField(requestBody.addOns),
+        customQuestions: parseCustomQuestionsField(requestBody.customQuestions),
         availability,
       },
       { new: true, runValidators: true },
     ).populate('organizer', getServicePopulate());
 
-    console.log('[service:update:response]', {
-      id: updatedService?._id,
-      title: updatedService?.title,
-      price: updatedService?.price,
-      category: updatedService?.category,
-      location: updatedService?.location,
-      imageCount: updatedService?.images?.length ?? 0,
-      upiId: updatedService?.upiId,
-    });
+    if (isDevelopmentEnv()) {
+      console.log('[service:update:response]', {
+        id: updatedService?._id,
+        title: updatedService?.title,
+        price: updatedService?.price,
+        bookingMode: updatedService?.bookingMode,
+        category: updatedService?.category,
+        location: updatedService?.location,
+        imageCount: updatedService?.images?.length ?? 0,
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -322,6 +471,10 @@ export const getServices = async (req: Request, res: Response, next: NextFunctio
 
     if (typeof req.query.organizer === 'string' && req.query.organizer.trim()) {
       filters.organizer = req.query.organizer.trim();
+    }
+
+    if (typeof req.query.bookingMode === 'string' && req.query.bookingMode.trim()) {
+      filters.bookingMode = req.query.bookingMode.trim();
     }
 
     if (typeof req.query.location === 'string' && req.query.location.trim()) {
@@ -370,6 +523,30 @@ export const getServices = async (req: Request, res: Response, next: NextFunctio
     const services = (await query)
       .filter((service) => !isSmokeTestService(service))
       .slice(0, limit || undefined);
+
+    res.status(200).json({
+      success: true,
+      count: services.length,
+      data: services,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMappedServices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestedLimit = parsePositiveInteger(req.query.limit);
+    const limit = requestedLimit ? Math.min(requestedLimit, 250) : 150;
+
+    const services = (await Service.find({
+      lat: { $gte: -90, $lte: 90 },
+      lng: { $gte: -180, $lte: 180 },
+    })
+      .select('title location lat lng availability createdAt updatedAt category images')
+      .sort({ createdAt: -1 })
+      .limit(limit))
+      .filter((service) => !isSmokeTestService(service));
 
     res.status(200).json({
       success: true,
