@@ -39,7 +39,7 @@ The project combines a React + Vite frontend with an Express + MongoDB backend a
 - Responsive frontend
 - Production build support
 
-## Tech Stack
+## Tech Stack:
 
 ### Frontend
 - React 19
