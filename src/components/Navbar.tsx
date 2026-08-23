@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
 import { Globe, Menu, X, Sparkles, LogOut, LayoutDashboard, ChevronDown, UserCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -37,10 +36,7 @@ export const Navbar: React.FC = React.memo(() => {
   const dashboardPath = getDashboardPathForRole(user?.role);
 
   return (
-    <motion.nav
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+    <nav
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 ${
         isScrolled ? 'py-4' : 'py-6'
       }`}
@@ -51,12 +47,9 @@ export const Navbar: React.FC = React.memo(() => {
         }`}>
           <div className="flex items-center gap-16">
             <Link to="/" className="flex items-center gap-3 group">
-              <motion.div
-                whileHover={{ rotate: 90 }}
-                className="w-12 h-12 bg-noir-accent flex items-center justify-center text-white shadow-xl shadow-noir-accent/20"
-              >
+              <div className="w-12 h-12 bg-noir-accent flex items-center justify-center text-white shadow-xl shadow-noir-accent/20 transition-transform duration-300 group-hover:rotate-90">
                 <Sparkles className="w-7 h-7" />
-              </motion.div>
+              </div>
               <span className="text-xl font-serif font-semibold text-noir-ink tracking-wide">EVENTO</span>
             </Link>
 
@@ -73,10 +66,7 @@ export const Navbar: React.FC = React.memo(() => {
                 >
                   {link.name}
                   {location.pathname === link.href && (
-                    <motion.span
-                      layoutId="nav-underline"
-                      className="absolute -bottom-2 left-0 w-full h-0.5 bg-noir-accent"
-                    />
+                    <span className="absolute -bottom-2 left-0 w-full h-0.5 bg-noir-accent" />
                   )}
                 </Link>
               ))}
@@ -111,14 +101,8 @@ export const Navbar: React.FC = React.memo(() => {
                     <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isProfileOpen ? 'rotate-180' : ''}`} />
                   </button>
 
-                  <AnimatePresence>
-                    {isProfileOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 mt-4 w-72 bg-white rounded-none border border-noir-border shadow-2xl p-4 z-50 overflow-hidden"
-                      >
+                  {isProfileOpen && (
+                      <div className="absolute right-0 mt-4 w-72 bg-white rounded-none border border-noir-border shadow-2xl p-4 z-50 overflow-hidden">
                         <div className="px-4 py-4 border-b border-noir-border mb-3">
                           <p className="text-[10px] font-semibold text-noir-accent uppercase tracking-[0.4em] mb-2">Signed in as</p>
                           <p className="text-sm font-mono font-semibold text-noir-ink truncate">{user?.email}</p>
@@ -144,9 +128,8 @@ export const Navbar: React.FC = React.memo(() => {
                           <LogOut className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
                           Logout
                         </button>
-                      </motion.div>
+                      </div>
                     )}
-                  </AnimatePresence>
                 </div>
               </div>
             ) : (
@@ -170,14 +153,8 @@ export const Navbar: React.FC = React.memo(() => {
         </div>
       </div>
 
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, x: '100%' }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: '100%' }}
-            className="lg:hidden fixed inset-0 w-full h-screen bg-noir-bg z-40 p-10 flex flex-col justify-center"
-          >
+      {isMobileMenuOpen && (
+          <div className="lg:hidden fixed inset-0 w-full h-screen bg-noir-bg z-40 p-10 flex flex-col justify-center">
             <button
               className="absolute top-10 right-10 p-4 border border-noir-border text-noir-ink"
               onClick={() => setIsMobileMenuOpen(false)}
@@ -223,9 +200,8 @@ export const Navbar: React.FC = React.memo(() => {
                 )}
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
-    </motion.nav>
+    </nav>
   );
 });

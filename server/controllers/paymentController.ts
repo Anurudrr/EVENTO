@@ -13,6 +13,7 @@ import {
   getPaymentVerificationLockError,
   isInactiveBookingStatus,
 } from '../utils/bookingState.ts';
+import { sendPaymentSubmittedAlertEmail, sendPaymentVerifiedEmail } from '../utils/mailer.ts';
 
 const userSelect = 'name email role profilePicture bio createdAt upiId';
 const organizerSelect = 'name email role profilePicture bio createdAt upiId';
@@ -283,6 +284,14 @@ export const verifyRazorpayPaymentForBooking = async (req: any, res: Response, n
 
     const populatedBooking = await populateBookingById(booking._id.toString());
 
+    sendPaymentVerifiedEmail({
+      buyerEmail: populatedBooking?.user?.email || '',
+      buyerName: populatedBooking?.user?.name || '',
+      serviceTitle: populatedBooking?.service?.title || '',
+      bookingReference: booking.bookingReference,
+      amount: booking.amount.toString(),
+    }).catch((err) => console.error('[email] Error sending payment verification:', err));
+
     res.status(200).json({
       success: true,
       data: populatedBooking,
@@ -475,6 +484,16 @@ export const submitUpiPayment = async (req: any, res: Response, next: NextFuncti
       populateBookingById(booking._id.toString()),
       populatePaymentById(payment._id.toString()),
     ]);
+
+    sendPaymentSubmittedAlertEmail({
+      sellerEmail: populatedBooking?.organizer?.email || '',
+      sellerName: populatedBooking?.organizer?.name || '',
+      serviceTitle: populatedBooking?.service?.title || '',
+      buyerName: populatedBooking?.user?.name || '',
+      bookingReference: booking.bookingReference,
+      amount: booking.amount.toString(),
+      utr: payment.utr || '',
+    }).catch((err) => console.error('[email] Error sending payment submission alert:', err));
 
     res.status(200).json({
       success: true,

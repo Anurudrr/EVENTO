@@ -50,10 +50,13 @@ const Home: React.FC = () => {
       }
     };
 
-    void loadHomeServices();
+    const loadTimer = window.setTimeout(() => {
+      void loadHomeServices();
+    }, 250);
 
     return () => {
       mounted = false;
+      window.clearTimeout(loadTimer);
     };
   }, []);
 

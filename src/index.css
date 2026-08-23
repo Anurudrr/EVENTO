@@ -7,12 +7,14 @@
   --font-mono: "JetBrains Mono", monospace;
   --font-serif: "Playfair Display", serif;
   
-  --color-noir-bg: #FDFBF7;
-  --color-noir-ink: #2D2D2D;
-  --color-noir-accent: #D4A373;
+  --color-noir-bg: #FAF7F1;
+  --color-noir-ink: #20252B;
+  --color-noir-accent: #B8834E;
+  --color-noir-blue: #355C7D;
+  --color-noir-sage: #657B5E;
   --color-noir-card: #FFFFFF;
-  --color-noir-border: rgba(0, 0, 0, 0.08);
-  --color-noir-muted: #7A7A7A;
+  --color-noir-border: rgba(32, 37, 43, 0.1);
+  --color-noir-muted: #66717B;
 }
 
 @layer base {
@@ -55,12 +57,12 @@
   }
 
   .text-gradient-noir {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-noir-ink via-noir-accent to-noir-muted;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-noir-ink via-noir-accent to-noir-blue;
   }
 
   .btn-noir {
     @apply relative overflow-hidden px-8 py-4 rounded-none font-serif tracking-widest transition-all duration-500 
-           bg-noir-ink text-white hover:bg-noir-accent hover:text-white
+           bg-noir-ink text-white hover:bg-noir-blue hover:text-white
            border border-transparent flex items-center justify-center gap-2;
   }
 
@@ -76,7 +78,7 @@
   }
 
   .noir-pattern {
-    background-image: radial-gradient(circle at 1px 1px, rgba(212, 163, 115, 0.1) 1px, transparent 0);
+    background-image: radial-gradient(circle at 1px 1px, rgba(53, 92, 125, 0.09) 1px, transparent 0);
     background-size: 48px 48px;
   }
 
@@ -152,7 +154,7 @@
   .site-loader__content {
     position: relative;
     width: min(34rem, calc(100vw - 3rem));
-    will-change: transform, opacity;
+    animation: loader-content-in 180ms ease-out both;
   }
 
   .site-loader__eyebrow {
@@ -191,7 +193,9 @@
     display: block;
     height: 0.3rem;
     transform-origin: left center;
+    transform: scaleX(0);
     background: linear-gradient(90deg, rgba(212, 163, 115, 0.88), rgba(255,255,255,0.92));
+    animation: loader-bar-fill 180ms ease-out forwards;
   }
 
   .custom-cursor {
@@ -249,9 +253,10 @@
     position: relative;
     overflow: clip;
     background:
-      radial-gradient(circle at 16% 18%, rgba(176, 142, 104, 0.2), transparent 30%),
-      radial-gradient(circle at 82% 22%, rgba(245, 231, 210, 0.52), transparent 24%),
-      linear-gradient(118deg, #d7c4ad 0%, #e2cfb8 34%, #efe3d3 66%, #e0ccb6 100%);
+      linear-gradient(90deg, rgba(32, 37, 43, 0.08) 1px, transparent 1px),
+      linear-gradient(rgba(32, 37, 43, 0.06) 1px, transparent 1px),
+      linear-gradient(118deg, #efe5d5 0%, #f8f2e9 36%, #e9f0ee 68%, #d9e2e7 100%);
+    background-size: 72px 72px, 72px 72px, 100% 100%;
   }
 
   .hero-stage__canvas,
@@ -276,9 +281,8 @@
 
   .hero-stage__backdrop {
     background:
-      radial-gradient(circle at 72% 34%, rgba(212, 163, 115, 0.24), transparent 24%),
-      radial-gradient(circle at 84% 22%, rgba(247, 236, 219, 0.48), transparent 19%),
-      linear-gradient(90deg, rgba(201, 178, 149, 0.54) 0%, rgba(232, 218, 199, 0.24) 52%, rgba(245, 237, 226, 0.08) 100%);
+      linear-gradient(90deg, rgba(250, 247, 241, 0.9) 0%, rgba(250, 247, 241, 0.44) 52%, rgba(255,255,255,0.08) 100%),
+      linear-gradient(180deg, rgba(53, 92, 125, 0.12), rgba(184, 131, 78, 0.08));
   }
 
   .hero-stage__grain {
@@ -305,15 +309,15 @@
   }
 
   .hero-kicker {
-    border: 1px solid rgba(72, 53, 34, 0.1);
-    background: rgba(251, 245, 237, 0.52);
+    border: 1px solid rgba(32, 37, 43, 0.1);
+    background: rgba(255, 255, 255, 0.6);
     padding: 0.72rem 1rem;
     border-radius: 999px;
     font-family: var(--font-sans);
     font-size: 0.9rem;
     font-weight: 500;
     line-height: 1;
-    color: rgba(59, 43, 27, 0.76);
+    color: rgba(32, 37, 43, 0.78);
     backdrop-filter: blur(16px);
     box-shadow: 0 18px 48px rgba(95, 67, 39, 0.1);
   }
@@ -325,13 +329,13 @@
   }
 
   .hero-headline {
-    max-width: 8.4ch;
+    max-width: 10.5ch;
     font-family: var(--font-serif);
-    font-size: clamp(4rem, 10vw, 7.4rem);
+    font-size: clamp(3.8rem, 8.4vw, 7.1rem);
     font-weight: 600;
-    line-height: 0.9;
-    letter-spacing: -0.04em;
-    color: #2f2419;
+    line-height: 0.92;
+    letter-spacing: 0;
+    color: var(--color-noir-ink);
   }
 
   .hero-headline__line {
@@ -339,13 +343,13 @@
   }
 
   .hero-headline__accent {
-    color: #b7844b;
+    color: var(--color-noir-blue);
     font-style: italic;
   }
 
   .hero-copy {
     max-width: 36rem;
-    color: #5f5146;
+    color: rgba(32, 37, 43, 0.72);
     font-family: var(--font-sans);
     font-size: clamp(1.02rem, 1.6vw, 1.18rem);
     line-height: 1.85;
@@ -385,17 +389,17 @@
   }
 
   .hero-stage__action--primary {
-    border-color: rgba(67, 47, 28, 0.22);
-    background: linear-gradient(135deg, #32251b 0%, #574130 100%);
-    color: #f6ede2;
-    box-shadow: 0 22px 60px rgba(80, 56, 33, 0.18);
+    border-color: rgba(32, 37, 43, 0.18);
+    background: linear-gradient(135deg, #20252b 0%, #355c7d 100%);
+    color: #ffffff;
+    box-shadow: 0 22px 60px rgba(32, 37, 43, 0.16);
   }
 
   .hero-stage__action--ghost {
-    background: rgba(250, 245, 237, 0.42);
-    color: #2f2419;
-    border-color: rgba(67, 47, 28, 0.16);
-    box-shadow: 0 18px 42px rgba(95, 67, 39, 0.08);
+    background: rgba(255, 255, 255, 0.56);
+    color: var(--color-noir-ink);
+    border-color: rgba(32, 37, 43, 0.14);
+    box-shadow: 0 18px 42px rgba(32, 37, 43, 0.08);
     backdrop-filter: blur(16px);
   }
 
@@ -559,7 +563,7 @@
   }
 
   .scene-section--light {
-    background: linear-gradient(180deg, rgba(253,251,247,1) 0%, rgba(247,243,238,0.88) 100%);
+    background: linear-gradient(180deg, rgba(250,247,241,1) 0%, rgba(246,248,247,0.9) 100%);
   }
 
   .scene-section--ink {
@@ -571,8 +575,8 @@
 
   .scene-section--contrast {
     background:
-      radial-gradient(circle at top left, rgba(212, 163, 115, 0.16), transparent 28%),
-      linear-gradient(180deg, #f8f4ee 0%, #fdfbf7 100%);
+      linear-gradient(135deg, rgba(53, 92, 125, 0.1) 0%, rgba(184, 131, 78, 0.1) 42%, transparent 74%),
+      linear-gradient(180deg, #f6f1e9 0%, #faf7f1 100%);
   }
 
   .scene-copy {
@@ -605,7 +609,7 @@
   }
 
   .scene-title span {
-    color: var(--color-noir-accent);
+    color: var(--color-noir-blue);
   }
 
   .scene-title--light,
@@ -1503,6 +1507,24 @@
   }
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes loader-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes loader-bar-fill {
+  to {
+    transform: scaleX(1);
   }
 }
 

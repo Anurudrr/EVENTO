@@ -1,7 +1,6 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useRef, useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { gsap } from 'gsap';
 import { HeroEditorialImage } from '../components/hero/HeroEditorialImage';
 import { HeroJourneyCard } from '../components/hero/HeroJourneyCard';
 import { HeroSearchBar } from '../components/hero/HeroSearchBar';
@@ -15,36 +14,10 @@ const CinematicHeroCanvas = lazy(() => import('../components/experience/Cinemati
 export const Hero: React.FC = React.memo(() => {
   const rootRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
-  const { allowCinematicEffects, isReducedMotion } = useAnimation();
+  const { allowCinematicEffects } = useAnimation();
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('Anywhere');
-  const shouldRenderCanvas = useIdleActivation(allowCinematicEffects, 2200);
-
-  useEffect(() => {
-    if (!rootRef.current || isReducedMotion) {
-      return undefined;
-    }
-
-    const sectionElement = rootRef.current;
-    const ctx = gsap.context(() => {
-      const timeline = gsap.timeline({ defaults: { ease: 'power3.out' } });
-
-      gsap.set('[data-hero-line]', { yPercent: 110, opacity: 0 });
-
-      timeline
-        .from('[data-hero-kicker]', { opacity: 0, y: 20, duration: 0.45 })
-        .to('[data-hero-line]', { yPercent: 0, opacity: 1, duration: 0.95, stagger: 0.09 }, '-=0.1')
-        .from('[data-hero-copy]', { opacity: 0, y: 24, duration: 0.6 }, '-=0.42')
-        .from('[data-hero-search]', { opacity: 0, y: 22, duration: 0.55 }, '-=0.35')
-        .from('[data-hero-actions]', { opacity: 0, y: 20, duration: 0.55 }, '-=0.32')
-        .from('[data-hero-card]', { opacity: 0, y: 24, duration: 0.55 }, '-=0.45')
-        .from('[data-hero-card-item]', { opacity: 0, y: 14, duration: 0.38, stagger: 0.08 }, '-=0.38');
-    }, rootRef);
-
-    return () => {
-      ctx.revert();
-    };
-  }, [isReducedMotion]);
+  const shouldRenderCanvas = useIdleActivation(allowCinematicEffects, 5000);
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -80,24 +53,24 @@ export const Hero: React.FC = React.memo(() => {
           <div data-hero-parallax="content" className="max-w-[44rem]">
             <div data-hero-kicker className="hero-kicker inline-flex items-center gap-3">
               <Sparkles className="h-4 w-4 text-noir-accent" />
-              EVENTO Curated Marketplace
+              Verified Event Services
             </div>
 
             <h1 className="hero-headline mt-8">
               <span className="hero-headline__line overflow-hidden">
                 <span data-hero-line className="block">
-                  Grace in the
+                  EVENTO
                 </span>
               </span>
               <span className="hero-headline__line overflow-hidden">
                 <span data-hero-line className="hero-headline__accent block">
-                  Extraordinary
+                  Event Services
                 </span>
               </span>
             </h1>
 
             <p data-hero-copy className="hero-copy mt-8">
-              Search premium photographers, venues, decorators, and planners in one elevated booking flow.
+              Find photographers, planners, decorators, caterers, venues, and performers with pricing, location, reviews, and booking in one place.
             </p>
 
             <form onSubmit={handleSearch} className="mt-10 space-y-5">
@@ -114,7 +87,7 @@ export const Hero: React.FC = React.memo(() => {
                   data-cursor="GO"
                   className="hero-cta hero-stage__action hero-stage__action--primary group"
                 >
-                  Search Services
+                  Find Services
                   <ArrowRight className="hero-stage__action-icon h-5 w-5" />
                 </button>
                 <Link

@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Github, Twitter, Linkedin, Instagram, ArrowUp, Sparkles, Mail, Phone, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -29,15 +28,13 @@ export const Footer: React.FC = () => {
             </p>
             <div className="flex gap-6">
               {[Twitter, Linkedin, Instagram, Github].map((Icon, index) => (
-                <motion.a
+                <a
                   key={index}
                   href="#"
-                  whileHover={{ y: -8, scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  className="w-14 h-14 rounded-none bg-white border border-noir-border flex items-center justify-center text-noir-muted hover:bg-noir-accent hover:text-white transition-all duration-500 hover:border-noir-accent shadow-xl"
+                  className="w-14 h-14 rounded-none bg-white border border-noir-border flex items-center justify-center text-noir-muted hover:-translate-y-2 hover:bg-noir-accent hover:text-white transition-all duration-500 hover:border-noir-accent shadow-xl"
                 >
                   <Icon className="w-6 h-6" />
-                </motion.a>
+                </a>
               ))}
             </div>
           </div>
@@ -123,14 +120,12 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          <motion.button
+          <button
             onClick={scrollToTop}
-            whileHover={{ y: -10 }}
-            whileTap={{ scale: 0.9 }}
-            className="w-16 h-16 rounded-none bg-white border border-noir-border flex items-center justify-center text-noir-muted hover:bg-noir-accent hover:text-white transition-all duration-700 group hover:border-noir-accent shadow-2xl"
+            className="w-16 h-16 rounded-none bg-white border border-noir-border flex items-center justify-center text-noir-muted hover:-translate-y-2 hover:bg-noir-accent hover:text-white transition-all duration-700 group hover:border-noir-accent shadow-2xl"
           >
             <ArrowUp className="w-8 h-8 group-hover:-translate-y-2 transition-transform duration-700" />
-          </motion.button>
+          </button>
         </div>
       </div>
 

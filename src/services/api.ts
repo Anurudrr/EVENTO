@@ -4,6 +4,7 @@ import { AUTH_EXPIRED_EVENT, clearStoredAuth } from '../utils/storage';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 8000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

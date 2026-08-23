@@ -1,9 +1,9 @@
 import React from 'react';
 
 const JOURNEY_STEPS = [
-  { index: '01', label: 'Find Services' },
-  { index: '02', label: 'Compare Options' },
-  { index: '03', label: 'Book Instantly' },
+  { index: '01', label: 'Filter by service, city, and budget' },
+  { index: '02', label: 'Compare verified vendors and reviews' },
+  { index: '03', label: 'Book, pay, and coordinate securely' },
 ] as const;
 
 export const HeroJourneyCard: React.FC = React.memo(() => {
@@ -16,12 +16,12 @@ export const HeroJourneyCard: React.FC = React.memo(() => {
       <div className="absolute -left-10 bottom-0 h-32 w-32 rounded-full bg-white/38 blur-3xl" />
 
       <div className="relative">
-        <span className="hero-kicker hero-kicker--soft">EVENTO Journey</span>
+        <span className="hero-kicker hero-kicker--soft">Booking Flow</span>
         <h2 className="mt-5 font-serif text-3xl leading-tight text-noir-ink md:text-4xl">
-          From Discovery to Booking
+          Shortlist to confirmed booking
         </h2>
         <p className="mt-4 max-w-sm text-base leading-8 text-noir-muted/85 md:text-lg">
-          A calmer path from first search to confirmed booking.
+          A practical path for buyers and vendors, built around clear options and fewer follow-up calls.
         </p>
       </div>
 
@@ -37,7 +37,7 @@ export const HeroJourneyCard: React.FC = React.memo(() => {
             <span className="font-mono text-sm font-semibold tracking-[0.24em] text-noir-accent">
               {step.index}
             </span>
-            <span className="text-lg text-noir-ink/92 md:text-xl">
+            <span className="text-base leading-7 text-noir-ink/92 md:text-lg">
               {step.label}
             </span>
           </div>

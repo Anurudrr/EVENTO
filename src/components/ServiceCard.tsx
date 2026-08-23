@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowUpRight, Bookmark, Briefcase, Clock3, MapPin, Share2, ShieldCheck, Star } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { Service } from '../types';
 import {
@@ -17,20 +16,12 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { userService } from '../services/userService';
-import { shouldEnablePointerEffects } from '../utils/performance';
 import { copyTextWithPermissionMemory, shareDataWithPermissionMemory } from '../utils/permissions';
 
 interface ServiceCardProps {
   service: Service;
   withEntryAnimation?: boolean;
 }
-
-const entryAnimationProps = {
-  initial: { opacity: 0, y: 20 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, amount: 0.2 },
-  transition: { duration: 0.35, ease: 'easeOut' as const },
-} as const;
 
 export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service, withEntryAnimation = true }) => {
   const serviceId = service._id;
@@ -40,9 +31,6 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service, wi
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const cardFrameRef = React.useRef<HTMLDivElement | null>(null);
-  const pointerFrameRef = React.useRef<number>(0);
-  const boundsRef = React.useRef<DOMRect | null>(null);
-  const pointerRef = React.useRef({ x: 0, y: 0 });
 
   const primaryImage = React.useMemo(() => {
     const [firstImage] = getServiceImageUrls(service);
@@ -89,77 +77,6 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service, wi
     });
   }, [service, serviceTitle]);
 
-  useEffect(() => {
-    const frame = cardFrameRef.current;
-    if (!frame || typeof window === 'undefined' || !shouldEnablePointerEffects()) {
-      return undefined;
-    }
-
-    const applyPointerTransform = () => {
-      pointerFrameRef.current = 0;
-
-      const rect = boundsRef.current;
-      if (!rect || rect.width === 0 || rect.height === 0) {
-        return;
-      }
-
-      const offsetX = (pointerRef.current.x - rect.left) / rect.width;
-      const offsetY = (pointerRef.current.y - rect.top) / rect.height;
-      const rotateX = (0.5 - offsetY) * 12;
-      const rotateY = (offsetX - 0.5) * 14;
-
-      frame.style.setProperty('--service-rotate-x', `${rotateX.toFixed(2)}deg`);
-      frame.style.setProperty('--service-rotate-y', `${rotateY.toFixed(2)}deg`);
-      frame.style.setProperty('--service-glow-x', `${(offsetX * 100).toFixed(2)}%`);
-      frame.style.setProperty('--service-glow-y', `${(offsetY * 100).toFixed(2)}%`);
-    };
-
-    const handlePointerEnter = () => {
-      boundsRef.current = frame.getBoundingClientRect();
-      frame.style.willChange = 'transform';
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!boundsRef.current) {
-        boundsRef.current = frame.getBoundingClientRect();
-      }
-
-      pointerRef.current.x = event.clientX;
-      pointerRef.current.y = event.clientY;
-
-      if (!pointerFrameRef.current) {
-        pointerFrameRef.current = window.requestAnimationFrame(applyPointerTransform);
-      }
-    };
-
-    const resetFrame = () => {
-      if (pointerFrameRef.current) {
-        window.cancelAnimationFrame(pointerFrameRef.current);
-        pointerFrameRef.current = 0;
-      }
-
-      boundsRef.current = null;
-      frame.style.willChange = 'auto';
-      frame.style.setProperty('--service-rotate-x', '0deg');
-      frame.style.setProperty('--service-rotate-y', '0deg');
-      frame.style.setProperty('--service-glow-x', '50%');
-      frame.style.setProperty('--service-glow-y', '50%');
-    };
-
-    frame.addEventListener('pointerenter', handlePointerEnter);
-    frame.addEventListener('pointermove', handlePointerMove);
-    frame.addEventListener('pointerleave', resetFrame);
-    frame.addEventListener('pointercancel', resetFrame);
-
-    return () => {
-      frame.removeEventListener('pointerenter', handlePointerEnter);
-      frame.removeEventListener('pointermove', handlePointerMove);
-      frame.removeEventListener('pointerleave', resetFrame);
-      frame.removeEventListener('pointercancel', resetFrame);
-      resetFrame();
-    };
-  }, [serviceId]);
-
   const handleWishlistToggle = async () => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -202,10 +119,9 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service, wi
   };
 
   return (
-    <motion.article
+    <article
       data-cursor="VIEW"
-      className="service-card group relative h-full"
-      {...(withEntryAnimation ? entryAnimationProps : {})}
+      className={`service-card group relative h-full ${withEntryAnimation ? 'service-card--entry' : ''}`}
     >
       <div ref={cardFrameRef} className="service-card__frame">
         <div className="service-card__spotlight" />
@@ -307,6 +223,6 @@ export const ServiceCard: React.FC<ServiceCardProps> = React.memo(({ service, wi
           </div>
         </div>
       </div>
-    </motion.article>
+    </article>
   );
 });

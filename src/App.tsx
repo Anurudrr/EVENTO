@@ -1,10 +1,11 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import { AnimationProvider } from './animations/AnimationProvider';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
+import { BottomNav } from './components/BottomNav';
 import { ScrollToTop } from './components/ScrollToTop';
 import { Footer } from './sections/Footer';
 import { useAuth } from './context/AuthContext';
@@ -88,138 +89,130 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {children}
       </div>
       <Footer />
+      <BottomNav />
     </div>
   );
 };
 
 const AnimatedRoutes = () => {
   const location = useLocation();
-  const { isReducedMotion } = useAnimation();
-  const isDashboardRoute = location.pathname.startsWith('/dashboard/');
 
   return (
-    <AnimatePresence initial={false} mode="sync">
-      <motion.div
-        key={location.pathname}
-        className="route-stage"
-        initial={isDashboardRoute || isReducedMotion ? false : { opacity: 0.985 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 1 }}
-        transition={{ duration: isDashboardRoute || isReducedMotion ? 0.01 : 0.14, ease: 'linear' }}
-      >
-        <Suspense fallback={<RouteFallback />}>
-          <Routes location={location}>
-            {/* Public Routes */}
-            <Route path="/" element={<Home />} />
-            <Route path="/events" element={<ServicesPage />} />
-            <Route path="/services" element={<Navigate to="/events" replace />} />
-            <Route path="/portfolio" element={<PortfolioPage />} />
-            <Route path="/booking" element={<BookingPage />} />
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/category/:slug" element={<CategoryPage />} />
-            <Route path="/event/:id" element={<ServiceDetailPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/faq" element={<FAQPage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/terms" element={<TermsPage />} />
-            <Route path="/refund-policy" element={<RefundPolicyPage />} />
-            <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
+    <div className="route-stage">
+      <Suspense fallback={<RouteFallback />}>
+        <Routes location={location}>
+          {/* Public Routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/events" element={<ServicesPage />} />
+          <Route path="/services" element={<Navigate to="/events" replace />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/booking" element={<BookingPage />} />
+          <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/category/:slug" element={<CategoryPage />} />
+          <Route path="/event/:id" element={<ServiceDetailPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/refund-policy" element={<RefundPolicyPage />} />
+          <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
 
-            {/* Auth Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
+          {/* Auth Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
 
-            {/* Dashboard Routes */}
-            <Route
-              path="/dashboard/buyer/*"
-              element={(
-                <ProtectedRoute allowedRoles={['user', 'admin']}>
-                  <BuyerDashboard />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/dashboard/seller/*"
-              element={(
-                <ProtectedRoute allowedRoles={['organizer', 'admin']}>
-                  <SellerDashboard />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/dashboard/admin"
-              element={(
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/dashboard/create-service"
-              element={(
-                <ProtectedRoute allowedRoles={['organizer', 'admin']}>
-                  <CreateServicePage />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/dashboard/my-services"
-              element={(
-                <ProtectedRoute allowedRoles={['organizer', 'admin']}>
-                  <MyServicesPage />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/dashboard/edit-service/:id"
-              element={(
-                <ProtectedRoute allowedRoles={['organizer', 'admin']}>
-                  <EditServicePage />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/profile"
-              element={(
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/receipt/:orderId"
-              element={(
-                <ProtectedRoute>
-                  <PaymentReceiptPage />
-                </ProtectedRoute>
-              )}
-            />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Suspense>
-      </motion.div>
-    </AnimatePresence>
+          {/* Dashboard Routes */}
+          <Route
+            path="/dashboard/buyer/*"
+            element={(
+              <ProtectedRoute allowedRoles={['user', 'admin']}>
+                <BuyerDashboard />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/dashboard/seller/*"
+            element={(
+              <ProtectedRoute allowedRoles={['organizer', 'admin']}>
+                <SellerDashboard />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/dashboard/admin"
+            element={(
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/dashboard/create-service"
+            element={(
+              <ProtectedRoute allowedRoles={['organizer', 'admin']}>
+                <CreateServicePage />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/dashboard/my-services"
+            element={(
+              <ProtectedRoute allowedRoles={['organizer', 'admin']}>
+                <MyServicesPage />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/dashboard/edit-service/:id"
+            element={(
+              <ProtectedRoute allowedRoles={['organizer', 'admin']}>
+                <EditServicePage />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/profile"
+            element={(
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/receipt/:orderId"
+            element={(
+              <ProtectedRoute>
+                <PaymentReceiptPage />
+              </ProtectedRoute>
+            )}
+          />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
+    </div>
   );
 };
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AnimationProvider>
-          <Router>
-            <SiteLoader />
-            <CustomCursor />
-            <ScrollToTop />
-            <AppShell>
-              <div className="flex-grow min-w-0">
-                <AnimatedRoutes />
-              </div>
-            </AppShell>
-          </Router>
-        </AnimationProvider>
-      </ToastProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <AnimationProvider>
+            <Router>
+              <SiteLoader />
+              <CustomCursor />
+              <ScrollToTop />
+              <AppShell>
+                <div className="flex-grow min-w-0">
+                  <AnimatedRoutes />
+                </div>
+              </AppShell>
+            </Router>
+          </AnimationProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

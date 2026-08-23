@@ -26,13 +26,12 @@ export const Booking: React.FC = () => {
       <div className="container mx-auto relative z-10">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
-            <span className="text-noir-accent font-mono font-semibold text-[10px] uppercase tracking-[0.5em] mb-8 block">Get in Touch</span>
-            <h2 className="text-2xl md:text-[6rem] font-serif font-semibold text-noir-ink tracking-wide mb-6 leading-[0.9]">
-              Let's plan your <br />
-              <span className="text-gradient-noir italic font-serif font-light">Next Event.</span>
+            <span className="text-noir-accent font-mono font-semibold text-[10px] uppercase tracking-[0.32em] mb-8 block">Booking Request</span>
+            <h2 className="text-4xl md:text-6xl font-serif font-semibold text-noir-ink mb-6 leading-tight">
+              Tell vendors what your event needs.
             </h2>
             <p className="text-xl text-noir-muted leading-relaxed mb-8 max-w-lg font-light tracking-normal">
-              Whether it's a global summit or an intimate celebration, our team is ready to bring your vision to life with precision, artistry, and a touch of aesthetic luxury.
+              Share the essentials once, add the location pin, and keep the request structured enough for faster vendor responses.
             </p>
             
             <div className="space-y-8">
@@ -42,7 +41,7 @@ export const Booking: React.FC = () => {
                 </div>
                 <div>
                   <span className="block text-noir-muted text-[10px] font-mono font-semibold uppercase tracking-[0.3em] mb-2">Call Us</span>
-                  <span className="text-noir-ink text-2xl font-serif font-semibold tracking-wide uppercase">+1 (800) EVENTO-GLOBAL</span>
+                  <span className="text-noir-ink text-xl md:text-2xl font-serif font-semibold tracking-normal">+1 (800) EVENTO</span>
                 </div>
               </div>
               
@@ -52,14 +51,14 @@ export const Booking: React.FC = () => {
                 </div>
                 <div>
                   <span className="block text-noir-muted text-[10px] font-mono font-semibold uppercase tracking-[0.3em] mb-2">Email Support</span>
-                  <span className="text-noir-ink text-2xl font-serif font-semibold tracking-wide uppercase">hello@evento.com</span>
+                  <span className="text-noir-ink text-xl md:text-2xl font-serif font-semibold tracking-normal">hello@evento.com</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-8 md:p-12 rounded-none shadow-2xl border border-noir-border relative">
-            <div className="absolute -top-8 -right-8 w-20 h-20 bg-noir-accent rounded-none flex items-center justify-center text-white animate-pulse border border-noir-border shadow-2xl">
+          <div className="bg-white p-8 md:p-12 rounded-[8px] shadow-2xl shadow-noir-blue/10 border border-noir-border relative">
+            <div className="absolute -top-6 -right-6 w-16 h-16 bg-noir-blue rounded-[8px] flex items-center justify-center text-white border border-noir-border shadow-2xl">
               <Sparkles className="w-10 h-10" />
             </div>
             
@@ -76,11 +75,11 @@ export const Booking: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <label className="text-[10px] font-mono font-semibold text-noir-muted uppercase tracking-widest ml-1">Full Name</label>
-                      <input 
+                      <input
                         type="text" 
                         required
-                        className="w-full bg-noir-bg border border-noir-border px-8 py-5 text-noir-ink rounded-none focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all font-mono uppercase tracking-widest placeholder:text-noir-muted/30"
-                        placeholder="JOHN DOE"
+                        className="w-full bg-noir-bg border border-noir-border px-5 py-4 text-noir-ink rounded-[8px] focus:outline-none focus:ring-1 focus:ring-noir-blue focus:border-noir-blue transition-all placeholder:text-noir-muted/40"
+                        placeholder="John Doe"
                       />
                     </div>
                     <div className="space-y-4">
@@ -88,8 +87,8 @@ export const Booking: React.FC = () => {
                       <input 
                         type="email" 
                         required
-                        className="w-full bg-noir-bg border border-noir-border px-8 py-5 text-noir-ink rounded-none focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all font-mono uppercase tracking-widest placeholder:text-noir-muted/30"
-                        placeholder="JOHN@COMPANY.COM"
+                        className="w-full bg-noir-bg border border-noir-border px-5 py-4 text-noir-ink rounded-[8px] focus:outline-none focus:ring-1 focus:ring-noir-blue focus:border-noir-blue transition-all placeholder:text-noir-muted/40"
+                        placeholder="john@company.com"
                       />
                     </div>
                   </div>
@@ -100,12 +99,12 @@ export const Booking: React.FC = () => {
                       <input 
                         type="date" 
                         required
-                        className="w-full bg-noir-bg border border-noir-border px-8 py-5 text-noir-ink rounded-none focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all font-mono uppercase tracking-widest"
+                        className="w-full bg-noir-bg border border-noir-border px-5 py-4 text-noir-ink rounded-[8px] focus:outline-none focus:ring-1 focus:ring-noir-blue focus:border-noir-blue transition-all"
                       />
                     </div>
                     <div className="space-y-4">
                       <label className="text-[10px] font-mono font-semibold text-noir-muted uppercase tracking-widest ml-1">Event Category</label>
-                      <select className="w-full bg-noir-bg border border-noir-border px-8 py-5 text-noir-ink rounded-none focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all appearance-none font-mono uppercase tracking-widest">
+                      <select className="w-full bg-noir-bg border border-noir-border px-5 py-4 text-noir-ink rounded-[8px] focus:outline-none focus:ring-1 focus:ring-noir-blue focus:border-noir-blue transition-all appearance-none">
                         <option className="bg-white">Corporate Summit</option>
                         <option className="bg-white">Product Launch</option>
                         <option className="bg-white">Private Gala</option>
@@ -118,8 +117,8 @@ export const Booking: React.FC = () => {
                     <label className="text-[10px] font-mono font-semibold text-noir-muted uppercase tracking-widest ml-1">Brief Description</label>
                     <textarea 
                       rows={4}
-                      className="w-full bg-noir-bg border border-noir-border px-8 py-5 text-noir-ink rounded-none focus:outline-none focus:ring-1 focus:ring-noir-accent focus:border-noir-accent transition-all resize-none font-mono uppercase tracking-widest placeholder:text-noir-muted/30"
-                      placeholder="TELL US A BIT ABOUT YOUR EVENT..."
+                      className="w-full bg-noir-bg border border-noir-border px-5 py-4 text-noir-ink rounded-[8px] focus:outline-none focus:ring-1 focus:ring-noir-blue focus:border-noir-blue transition-all resize-none placeholder:text-noir-muted/40"
+                      placeholder="Tell us a bit about your event..."
                     />
                   </div>
 
@@ -148,7 +147,7 @@ export const Booking: React.FC = () => {
                   <button 
                     type="submit"
                     disabled={!selectedServiceLocation}
-                    className="w-full btn-noir !py-6 font-serif text-lg uppercase tracking-widest flex items-center justify-center gap-4 group"
+                    className="w-full btn-noir !rounded-[8px] !py-5 font-serif text-lg tracking-wide flex items-center justify-center gap-4 group"
                   >
                     {selectedServiceLocation ? 'Send Inquiry' : 'Select Service Location'}
                     <ArrowRight className="w-6 h-6 group-hover:translate-x-3 transition-transform" />

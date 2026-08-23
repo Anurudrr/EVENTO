@@ -1,283 +1,184 @@
-# EVENTO
+# 🎪 EVENTO — Premium Event Marketplace
 
 [![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://evento-six-livid.vercel.app)
-[![GitHub](https://img.shields.io/badge/GitHub-Repo-blue)](https://github.com/Anurudrr/EVENTO)
+[![CI](https://github.com/Anurudrr/EVENTO/actions/workflows/ci.yml/badge.svg)](https://github.com/Anurudrr/EVENTO/actions)
+[![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue)]()
+[![Vercel](https://img.shields.io/badge/Deployed-Vercel-black)](https://evento-six-livid.vercel.app)
 
-EVENTO is a full-stack event marketplace where attendees can discover and book event services, while organizers can create listings, manage bookings, and grow their presence on the platform.
+> A cinematic, full-stack event marketplace built with React 19 + Express + MongoDB. Book photographers, venues, decorators, and planners — all in one elevated flow.
 
-The project combines a React + Vite frontend with an Express + MongoDB backend and supports JWT authentication, OTP-based signup/login, wishlist management, reviews, bookings, contact submissions, and vendor dashboards.
+---
 
-## Features
+## 🌐 Live
 
-### Attendee features
-- User signup and login
-- Browse and search event services
-- Filter by category, location, price, and rating
-- View event details
-- Save services to wishlist
-- Book event services
-- View and cancel bookings
-- Update profile
-- Submit reviews
+**[https://evento-six-livid.vercel.app](https://evento-six-livid.vercel.app)**
 
-### Organizer features
-- Organizer signup and login
-- Create event listings
-- Upload listing images
-- View own events
-- Delete events
-- View organizer bookings
-- Access organizer dashboard
+---
 
-### Platform features
-- Protected routes
-- JWT authentication
-- OTP signup/login with secure email delivery and TTL expiry
-- MongoDB persistence
-- Contact form submission
-- Review and rating support
-- Responsive frontend
-- Production build support
+## ✨ Key Features
 
-## Tech Stack:
+### 💳 UPI QR Payment System
+Custom-built QR-based payment flow with seller verification, transaction ID (UTR) validation, and email confirmation. Built **without Razorpay** to work without a registered business domain. The system:
+- Generates a per-booking UPI deep link and QR code
+- 10-minute countdown timer with auto-expiry
+- Buyer submits UTR reference after payment
+- Seller verifies or rejects from their dashboard
+- Both parties receive email notification on resolution
+- Automatic 5-second status polling after UTR submission
 
-### Frontend
-- React 19
-- Vite
-- TypeScript
-- Tailwind CSS
-- Framer Motion
-- GSAP
-- React Router
-- Axios
+### 🎨 Cinematic Design System
+- Custom "Noir" aesthetic with CSS custom properties
+- GSAP-powered hero animations with parallax and tilt effects
+- Framer Motion page transitions and micro-animations
+- 3D service card tilt on pointer move
+- Custom cursor with context-aware labels
 
-### Backend
-- Node.js
-- Express
-- TypeScript
-- MongoDB
-- Mongoose
-- JWT
-- Bcrypt
-- Multer
-- Joi
+### 🔐 Authentication
+- OTP-based email login (no plain passwords stored)
+- Google OAuth via `google-auth-library`
+- JWT access tokens with role-based route protection
+- Organizer verification workflow (admin-approved)
 
-## Project Structure
+### 📦 Service Management
+- Sellers create and edit listings with images, pricing, availability, and policy fields
+- Cloudinary image uploads with magic-byte validation
+- Interactive Leaflet map for pinning service location
+- Availability calendar with blocked-date management
 
-```text
-src/
-  components/
-  context/
-  layouts/
-  pages/
-  sections/
-  services/
-  types/
-  utils/
+### 📊 Dual-Role Dashboards
+- **Buyer Dashboard**: bookings, wishlist, payment history, chat
+- **Seller Dashboard**: incoming bookings, payment verification, revenue stats, service management
+- **Admin Dashboard**: user management, organizer verification, payment oversight
 
-server/
-  config/
-  controllers/
-  middleware/
-  models/
-  routes/
-  utils/
-```
+### 🔔 Notifications
+- In-app notification bell with unread count badge
+- Server-side notification stream (SSE-ready)
+- Polling fallback (20s interval, pauses when tab is hidden)
 
-## Local Setup
+### 🗺️ Location Features
+- Buyer pins their desired service location on a map at booking time
+- Seller sees both the venue pin and their own service pin
+- One-tap Google Maps directions link
+
+### 🔍 Shareable Search & Filters
+- All filters (search, category, location, price, rating, sort) synced to URL params
+- Deep-linkable filtered result pages
+- 300ms debounced search to reduce API calls
+
+---
+
+## 🛠 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, TypeScript, Tailwind CSS v4 |
+| Animations | Framer Motion, GSAP 3, Three.js |
+| Routing | React Router v7 |
+| Backend | Node.js, Express 5, TypeScript |
+| Database | MongoDB Atlas, Mongoose 9 |
+| Auth | JWT, Bcrypt, Google OAuth |
+| Payments | Custom UPI QR (no gateway dependency) |
+| Email | Nodemailer (SMTP + mock dev fallback) |
+| Maps | Leaflet, React Leaflet |
+| Images | Cloudinary (with magic-byte upload validation) |
+| Hosting | Vercel (frontend + serverless backend) |
+| Security | Helmet, express-rate-limit, express-mongo-sanitize, Joi |
+
+---
+
+## 🚀 Local Development
 
 ### Prerequisites
 - Node.js 20+
-- npm
-- MongoDB local instance or MongoDB Atlas
+- MongoDB Atlas connection string
+- (Optional) SMTP credentials for email
 
-### 1. Install dependencies
+### Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/Anurudrr/EVENTO.git
+cd EVENTO
+
+# Install dependencies
 npm install
-```
 
-### 2. Create your environment file
+# Configure environment
+cp .env.example .env
+# Fill in MONGO_URI, JWT_SECRET, etc.
 
-Create a `.env` file in the project root and copy values from `.env.example`.
-Do not commit `.env`, `.vercel.env`, or exported secret files.
-
-Example:
-
-```env
-PORT=3000
-NODE_ENV=development
-MONGO_URI=mongodb://localhost:27017/evento
-JWT_SECRET=replace_with_a_long_random_secret
-JWT_EXPIRE=30d
-OTP_DELIVERY_MODE=auto
-ALLOW_DIRECT_REGISTER=false
-CORS_ORIGIN=http://localhost:3000
-RATE_LIMIT_WINDOW=15
-RATE_LIMIT_MAX=100
-```
-
-### 3. Start the app
-
-```bash
+# Start development server (frontend + backend together)
 npm run dev
 ```
 
-The app runs on:
+The app runs at **http://localhost:3000** in development (frontend served via Vite middleware).
 
-- Frontend + backend server: `http://localhost:3000`
+### Environment Variables
 
-If SMTP is not configured outside production, OTP delivery falls back to a secure local outbox at `.dev-mail/otp-outbox/`. OTP values are never returned in API responses or logged to the console.
+See [`.env.example`](.env.example) for all required variables. Key ones:
 
-Image uploads prefer Cloudinary when it is configured. If Cloudinary is unavailable, the app falls back to local storage under `uploads/`.
+| Variable | Purpose |
+|---|---|
+| `MONGO_URI` | MongoDB Atlas connection string |
+| `JWT_SECRET` | JWT signing secret (32+ chars) |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary account name |
+| `CLOUDINARY_API_KEY` | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
+| `SMTP_HOST` | Email SMTP host |
+| `SMTP_USER` | Email SMTP username |
+| `SMTP_PASS` | Email SMTP password |
+| `VITE_API_URL` | Backend API base URL |
 
-### 4. Run the production build locally
+---
 
-```bash
-npm run build
-npm run start
+## 📁 Project Structure
+
+```
+EVENTO/
+├── src/                    # Frontend (React + Vite)
+│   ├── components/         # Reusable UI components
+│   ├── context/            # React contexts (Auth, Toast, Theme)
+│   ├── hooks/              # Custom hooks
+│   ├── pages/              # Route pages
+│   ├── sections/           # Page sections (Hero, Footer, etc.)
+│   ├── services/           # API service clients
+│   ├── types/              # TypeScript types
+│   └── utils/              # Utility functions
+├── server/                 # Backend (Express + TypeScript)
+│   ├── controllers/        # Route handlers
+│   ├── middleware/         # Auth, validation, error handling
+│   ├── models/             # Mongoose models
+│   ├── routes/             # Express routers
+│   └── utils/              # Server utilities (mailer, cloudinary, etc.)
+├── api/                    # Vercel serverless entry point
+└── public/                 # Static assets
 ```
 
-By default the production server also runs on `http://localhost:3000`.
+---
 
-### 5. Validate before deployment
+## 🔒 Security
 
-```bash
-npm run lint
-npm run build
-```
+- **Helmet**: HTTP security headers
+- **Rate limiting**: 5 req/15min on OTP, 10/15min on login, 10/15min on payment
+- **MongoDB injection**: `express-mongo-sanitize` on all API requests
+- **File uploads**: MIME + magic-byte validation, filename sanitization, 5MB max
+- **Input validation**: Joi schemas on all POST/PUT routes
+- **CORS**: Configurable origin whitelist via `CORS_ORIGINS` env variable
 
-## Main API Routes
+---
 
-### Auth
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/send-otp`
-- `POST /api/auth/verify-otp`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `POST /api/auth/register` is disabled by default unless `ALLOW_DIRECT_REGISTER=true`
+## 🤝 Contributing
 
-### Events
-- `GET /api/events`
-- `GET /api/events/:id`
-- `POST /api/events`
-- `PUT /api/events/:id`
-- `DELETE /api/events/:id`
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit conventions and PR guidelines.
 
-### Services
-- `GET /api/services`
-- `GET /api/services/map`
-- `GET /api/services/:id`
-- `POST /api/services`
-- `PUT /api/services/:id`
-- `DELETE /api/services/:id`
+---
 
-### Bookings
-- `POST /api/bookings`
-- `GET /api/bookings/mybookings`
-- `GET /api/bookings/organizer`
-- `DELETE /api/bookings/:id`
+## 👤 Author
 
-### Users
-- `GET /api/users/profile`
-- `PUT /api/users/profile`
-- `GET /api/users/wishlist`
-- `POST /api/users/wishlist/:eventId`
-- `DELETE /api/users/wishlist/:eventId`
+Built by **Anurudr** — [GitHub](https://github.com/Anurudrr)
 
-### Reviews
-- `GET /api/reviews/:eventId`
-- `POST /api/reviews/:eventId`
-- `DELETE /api/reviews/:id`
+---
 
-### Contact
-- `POST /api/contact`
+## 📄 License
 
-### Health
-- `GET /api/health`
-
-## Deployment Overview
-
-Recommended stack:
-
-1. Frontend on Vercel
-2. Backend on Render
-3. Database on MongoDB Atlas
-
-High-level flow:
-
-1. Create MongoDB Atlas cluster
-2. Deploy backend to Render
-3. Add backend environment variables
-4. Deploy frontend to Vercel
-5. Point frontend API base/config to backend domain if needed
-6. Update backend `CORS_ORIGIN` with frontend domain
-
-## Screenshots
-
-> Screenshots coming soon. Visit the live demo at https://evento-six-livid.vercel.app
-
-## Testing Checklist
-
-### Attendee flow
-- Register as attendee with OTP
-- Login successfully with password
-- Login successfully with OTP
-- Refresh while logged in and confirm the session persists
-- Logout and confirm protected pages redirect back to login
-- Browse events
-- Search and filter
-- Save to wishlist
-- Open event detail page
-- Book an event
-- View booking in dashboard
-- Cancel booking
-- Update profile
-- Submit a review
-
-### Organizer flow
-- Register as organizer with OTP
-- Login successfully
-- Open seller dashboard
-- Create a new event
-- Upload images
-- View listing in events page
-- Receive booking from attendee account
-- Confirm booking appears in organizer dashboard
-
-### Contact flow
-- Submit contact form
-- Verify data is stored in MongoDB
-
-## Future Improvements
-
-- Edit event flow for organizers from dashboard UI
-- Booking quantity selector on event page
-- Better organizer messaging system
-- Admin dashboard
-- Payment gateway integration
-- Cloud image storage instead of local uploads
-- Email notifications
-- Automated tests
-- CI/CD pipeline
-
-## Production Notes
-
-> ⚠️ **Security Notice:** Never commit `.env`, `.vercel.env`, or any secret files to Git.
-> If secrets were previously committed, rotate them immediately:
-> - Cloudinary: cloudinary.com → Settings → Access Keys
-> - JWT_SECRET / OTP_SECRET: regenerate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
-> - SMTP: reset via your email provider
-
-- Use a strong `JWT_SECRET`
-- Set `OTP_DELIVERY_MODE=email` and configure SMTP before using live OTP delivery
-- Keep `ALLOW_DIRECT_REGISTER=false` unless you explicitly need the legacy direct-register endpoint
-- Restrict `CORS_ORIGIN` to your real frontend domain
-- Persist or externalize uploads in production
-- Use MongoDB Atlas backups and monitoring
-- Run behind HTTPS only
-
-## License
-
-This project is for portfolio and educational use unless you choose to license it differently.
+MIT

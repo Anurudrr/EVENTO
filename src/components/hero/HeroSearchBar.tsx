@@ -27,9 +27,9 @@ export const HeroSearchBar: React.FC<HeroSearchBarProps> = React.memo(({
   return (
     <div
       data-hero-search
-      className="grid gap-3 rounded-[30px] border border-black/8 bg-[rgba(250,245,237,0.58)] p-3 shadow-[0_24px_90px_rgba(95,67,39,0.12)] backdrop-blur-[24px] md:grid-cols-[minmax(0,1fr)_220px]"
+      className="grid gap-3 rounded-[24px] border border-noir-border bg-white/58 p-3 shadow-[0_24px_90px_rgba(32,37,43,0.11)] backdrop-blur-[24px] md:grid-cols-[minmax(0,1fr)_220px]"
     >
-      <label className="flex items-center gap-3 rounded-[22px] border border-black/8 bg-white/56 px-5 py-4 text-noir-muted transition-colors duration-300 focus-within:border-noir-accent/38 focus-within:text-noir-ink">
+      <label className="flex items-center gap-3 rounded-[18px] border border-noir-border bg-white/70 px-5 py-4 text-noir-muted transition-colors duration-300 focus-within:border-noir-blue/40 focus-within:text-noir-ink">
         <Search className="h-5 w-5 shrink-0 text-noir-accent" />
         <input
           value={query}
@@ -41,7 +41,7 @@ export const HeroSearchBar: React.FC<HeroSearchBarProps> = React.memo(({
         />
       </label>
 
-      <label className="relative flex items-center gap-3 rounded-[22px] border border-black/8 bg-white/56 px-5 py-4 text-noir-muted transition-colors duration-300 focus-within:border-noir-accent/38 focus-within:text-noir-ink">
+      <label className="relative flex items-center gap-3 rounded-[18px] border border-noir-border bg-white/70 px-5 py-4 text-noir-muted transition-colors duration-300 focus-within:border-noir-blue/40 focus-within:text-noir-ink">
         <MapPin className="h-5 w-5 shrink-0 text-noir-accent" />
         <select
           value={location}

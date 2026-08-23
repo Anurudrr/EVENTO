@@ -1,5 +1,4 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 
 type ToastVariant = 'success' | 'error' | 'info';
@@ -47,28 +46,23 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={value}>
       {children}
       <div className="fixed right-4 top-4 z-[120] flex w-full max-w-sm flex-col gap-3">
-        <AnimatePresence>
-          {toasts.map((toast) => {
-            const Icon = iconMap[toast.variant];
+        {toasts.map((toast) => {
+          const Icon = iconMap[toast.variant];
 
-            return (
-              <motion.div
-                key={toast.id}
-                initial={{ opacity: 0, x: 20, scale: 0.96 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 20, scale: 0.96 }}
-                className={`border px-4 py-4 shadow-2xl backdrop-blur-md ${colorMap[toast.variant]}`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className="h-5 w-5 shrink-0" />
-                  <p className="text-xs font-mono font-semibold uppercase tracking-[0.25em]">
-                    {toast.title}
-                  </p>
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+          return (
+            <div
+              key={toast.id}
+              className={`border px-4 py-4 shadow-2xl backdrop-blur-md ${colorMap[toast.variant]}`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className="h-5 w-5 shrink-0" />
+                <p className="text-xs font-mono font-semibold uppercase tracking-[0.25em]">
+                  {toast.title}
+                </p>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

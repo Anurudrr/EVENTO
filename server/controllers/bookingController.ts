@@ -16,6 +16,7 @@ import {
   getPaymentVerificationLockError,
   isInactiveBookingStatus,
 } from '../utils/bookingState.ts';
+import { sendBookingConfirmationEmail, sendNewBookingAlertEmail, sendPaymentVerifiedEmail } from '../utils/mailer.ts';
 
 const userSelect = 'name email role profilePicture bio createdAt upiId';
 const organizerSelect = 'name email role profilePicture bio createdAt upiId';
@@ -400,6 +401,30 @@ export const createBooking = async (req: any, res: Response, next: NextFunction)
       },
     });
 
+    sendBookingConfirmationEmail({
+      buyerEmail: populatedBooking?.user?.email || req.user.email,
+      buyerName: populatedBooking?.user?.name || req.user.name,
+      serviceTitle: populatedBooking?.service?.title || service.title,
+      bookingReference: booking.bookingReference,
+      date: toDateKey(normalizedDate),
+      time: booking.time,
+      amount: pricing.advanceAmount.toString(),
+      eventType: booking.eventType,
+    }).catch((err) => console.error('[email] Error sending booking confirmation:', err));
+
+    sendNewBookingAlertEmail({
+      sellerEmail: populatedBooking?.organizer?.email || '',
+      sellerName: populatedBooking?.organizer?.name || '',
+      serviceTitle: populatedBooking?.service?.title || service.title,
+      buyerName: populatedBooking?.user?.name || req.user.name,
+      bookingReference: booking.bookingReference,
+      date: toDateKey(normalizedDate),
+      time: booking.time,
+      amount: pricing.advanceAmount.toString(),
+      eventType: booking.eventType,
+      guests: booking.guests,
+    }).catch((err) => console.error('[email] Error sending booking alert to seller:', err));
+
     res.status(201).json({
       success: true,
       data: populatedBooking,
@@ -678,6 +703,14 @@ export const verifyPayment = async (req: any, res: Response, next: NextFunction)
     });
 
     const populatedBooking = await populateBookingById(booking._id.toString());
+
+    sendPaymentVerifiedEmail({
+      buyerEmail: populatedBooking?.user?.email || '',
+      buyerName: populatedBooking?.user?.name || '',
+      serviceTitle: populatedBooking?.service?.title || '',
+      bookingReference: booking.bookingReference,
+      amount: booking.amount.toString(),
+    }).catch((err) => console.error('[email] Error sending payment verification:', err));
 
     res.status(200).json({
       success: true,

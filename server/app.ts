@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import mongoSanitize from 'express-mongo-sanitize';
 import connectDB from './config/db.ts';
 import errorHandler from './middleware/errorMiddleware.ts';
 import authRoutes from './routes/authRoutes.ts';
@@ -125,6 +126,9 @@ export const createApp = () => {
     origin: getCorsOrigins(),
     credentials: true,
   }));
+
+  // Prevent MongoDB operator injection in request bodies, queries, and params
+  app.use(mongoSanitize());
 
   app.use('/api', apiLimiter);
 
